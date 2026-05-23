@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/PageHeader";
@@ -12,8 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Download, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { downloadXLSX, parseSpreadsheet } from "@/lib/export";
 import {
   brl, dateTimeBR,
   CHANNELS, PAYMENT_METHODS, PAYMENT_STATUSES, ORDER_STATUSES,
@@ -43,6 +44,7 @@ function Page() {
   const [selProduct, setSelProduct] = useState("");
   const [selVariant, setSelVariant] = useState("");
   const [selQty, setSelQty] = useState("1");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: orders } = useQuery({
     queryKey: ["orders"],
@@ -150,10 +152,69 @@ function Page() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const exportOrders = () => {
+    const rows = (orders ?? []).map((o: any) => ({
+      Código: o.order_code,
+      Cliente: o.customers?.name ?? "Cliente avulso",
+      Canal: channelLabel(o.channel),
+      "Forma pagamento": paymentMethodLabel(o.payment_method),
+      "Status pagamento": paymentStatusLabel(o.payment_status),
+      Status: orderStatusLabel(o.status),
+      Subtotal: Number(o.subtotal ?? 0),
+      Desconto: Number(o.discount ?? 0),
+      Frete: Number(o.shipping ?? 0),
+      Total: Number(o.total ?? 0),
+      Observações: o.notes ?? "",
+      "Data": o.created_at,
+    }));
+    downloadXLSX(`pedidos-${new Date().toISOString().slice(0, 10)}.xlsx`, { Pedidos: rows });
+  };
+
+  const importOrders = useMutation({
+    mutationFn: async (file: File) => {
+      const rows = await parseSpreadsheet(file);
+      if (rows.length === 0) throw new Error("Planilha vazia");
+      const channelMap: Record<string, string> = { presencial: "presencial", site: "site", instagram: "instagram", shopee: "shopee", "tiktok shop": "tiktok_shop", tiktok: "tiktok_shop", woocommerce: "woocommerce", whatsapp: "whatsapp", outros: "outros" };
+      const norm = (v: any) => String(v ?? "").trim().toLowerCase();
+      let ok = 0;
+      for (const r of rows) {
+        const total = Number(r["Total"] ?? r["total"] ?? 0);
+        if (!total) continue;
+        const channel = channelMap[norm(r["Canal"] ?? r["canal"])] ?? "outros";
+        const subtotal = Number(r["Subtotal"] ?? r["subtotal"] ?? total);
+        const discount = Number(r["Desconto"] ?? r["desconto"] ?? 0);
+        const shipping = Number(r["Frete"] ?? r["frete"] ?? 0);
+        const { error } = await supabase.from("orders").insert({
+          channel: channel as any,
+          seller_id: user?.id,
+          payment_method: "outros" as any,
+          payment_status: "confirmado" as any,
+          status: "entregue" as any,
+          subtotal, discount, shipping, total,
+          notes: r["Observações"] ?? r["observacoes"] ?? null,
+          external_reference: r["Código"] ?? r["codigo"] ?? null,
+        });
+        if (!error) ok++;
+      }
+      return ok;
+    },
+    onSuccess: (n) => {
+      toast.success(`${n} pedidos importados`);
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <PageHeader title="Pedidos" subtitle="Cadastro e acompanhamento de vendas"
         actions={
+          <div className="flex items-center gap-2">
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importOrders.mutate(f); e.target.value = ""; }} />
+            <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={importOrders.isPending}><Upload className="h-4 w-4 mr-1" /> Importar</Button>
+            <Button variant="outline" onClick={exportOrders}><Download className="h-4 w-4 mr-1" /> Baixar</Button>
           <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
             <DialogTrigger asChild><Button className="bg-gradient-brand text-primary-foreground border-0 shadow-glow"><Plus className="h-4 w-4 mr-1" /> Novo pedido</Button></DialogTrigger>
             <DialogContent className="max-w-3xl">
