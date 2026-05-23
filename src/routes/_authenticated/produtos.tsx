@@ -63,11 +63,21 @@ function Page() {
       const payload: any = {
         name: f.name, sku: f.sku || null, category: f.category || null, brand: f.brand || null,
         supplier_id: f.supplier_id || null, photo_url: f.photo_url || null,
-        cost: Number(f.cost || 0), price: Number(f.price || 0),
+        cost: Number(f.cost || 0),
+        packaging_cost: Number(f.packaging_cost || 0),
+        other_costs: Number(f.other_costs || 0),
+        target_margin: Number(f.target_margin || 0),
         stock: f.has_variants ? 0 : Number(f.stock || 0),
         min_stock: f.has_variants ? 0 : Number(f.min_stock || 0),
         has_variants: f.has_variants,
       };
+      const prices = calcAllPrices(
+        Number(f.cost || 0), Number(f.packaging_cost || 0), Number(f.other_costs || 0), Number(f.target_margin || 0),
+      );
+      payload.price_site = prices.site;
+      payload.price_shopee = prices.shopee;
+      payload.price_tiktok = prices.tiktok;
+      payload.price = prices.site ?? Number(f.cost || 0);
       const { data: p, error } = await supabase.from("products").insert(payload).select("id").single();
       if (error) throw error;
       if (!f.has_variants && Number(f.stock) > 0) {
@@ -109,7 +119,10 @@ function Page() {
                 </div>
                 <div className="col-span-2 space-y-1.5"><Label>URL da foto</Label><Input value={form.photo_url} onChange={(e) => setForm({ ...form, photo_url: e.target.value })} placeholder="https://…" /></div>
                 <div className="space-y-1.5"><Label>Custo (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Preço de venda (R$)</Label><Input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Embalagem (R$)</Label><Input type="number" step="0.01" value={form.packaging_cost} onChange={(e) => setForm({ ...form, packaging_cost: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>Outros custos (R$)</Label><Input type="number" step="0.01" value={form.other_costs} onChange={(e) => setForm({ ...form, other_costs: e.target.value })} placeholder="Ex: brinde, etiqueta…" /></div>
+                <div className="space-y-1.5"><Label>Margem desejada (%)</Label><Input type="number" step="0.1" value={form.target_margin} onChange={(e) => setForm({ ...form, target_margin: e.target.value })} /></div>
+                <PricePreview cost={form.cost} packaging={form.packaging_cost} other={form.other_costs} margin={form.target_margin} />
                 <div className="col-span-2 flex items-start gap-2 rounded-md border border-border p-3 bg-muted/30">
                   <Checkbox id="hv" checked={form.has_variants} onCheckedChange={(v) => setForm({ ...form, has_variants: Boolean(v) })} />
                   <div className="space-y-1">
