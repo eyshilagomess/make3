@@ -11,10 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Layers, Trash2 } from "lucide-react";
+import { Plus, Search, Layers, Trash2, Upload, Download } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { brl } from "@/lib/format";
+import { calcAllPrices, CHANNEL_FEES, CHANNEL_LABEL, totalCost } from "@/lib/pricing";
+import * as XLSX from "xlsx";
 
 export const Route = createFileRoute("/_authenticated/produtos")({
   head: () => ({ meta: [{ title: "Produtos — Make 3" }] }),
@@ -23,10 +25,15 @@ export const Route = createFileRoute("/_authenticated/produtos")({
 
 type Form = {
   name: string; sku: string; category: string; brand: string; supplier_id: string;
-  photo_url: string; cost: string; price: string; stock: string; min_stock: string;
+  photo_url: string; cost: string; packaging_cost: string; other_costs: string; target_margin: string;
+  stock: string; min_stock: string;
   has_variants: boolean;
 };
-const empty: Form = { name: "", sku: "", category: "", brand: "", supplier_id: "", photo_url: "", cost: "0", price: "0", stock: "0", min_stock: "0", has_variants: false };
+const empty: Form = {
+  name: "", sku: "", category: "", brand: "", supplier_id: "", photo_url: "",
+  cost: "0", packaging_cost: "0", other_costs: "0", target_margin: "30",
+  stock: "0", min_stock: "0", has_variants: false,
+};
 
 function Page() {
   const qc = useQueryClient();
