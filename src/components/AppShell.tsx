@@ -1,5 +1,5 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, ShoppingBag, Package, Users, Truck, Boxes, LogOut } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Package, Users, Truck, Boxes, LogOut, BarChart3 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/make3-logo.jpg";
@@ -7,6 +7,7 @@ import logo from "@/assets/make3-logo.jpg";
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/pedidos", label: "Pedidos", icon: ShoppingBag },
+  { to: "/vendas", label: "Vendas", icon: BarChart3 },
   { to: "/produtos", label: "Produtos", icon: Package },
   { to: "/estoque", label: "Movimentações", icon: Boxes },
   { to: "/clientes", label: "Clientes", icon: Users },
