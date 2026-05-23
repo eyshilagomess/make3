@@ -18,7 +18,7 @@ function AuthPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,15 +30,17 @@ function AuthPage() {
   const handle = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    const cleanUser = username.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, "");
+    const email = `${cleanUser}@make3.local`;
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: fullName }, emailRedirectTo: `${window.location.origin}/dashboard` },
+          options: { data: { full_name: fullName || cleanUser } },
         });
         if (error) throw error;
-        toast.success("Conta criada! Confirme seu email para acessar.");
+        toast.success("Conta criada! Você já pode entrar.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -77,7 +79,7 @@ function AuthPage() {
           </div>
           <h1 className="text-2xl font-bold">{mode === "signin" ? "Acesse sua conta" : "Criar conta"}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {mode === "signin" ? "Entre com seu email e senha." : "Crie uma conta da equipe Make 3."}
+            {mode === "signin" ? "Entre com seu usuário e senha." : "Crie uma conta da equipe Make 3."}
           </p>
 
           <form onSubmit={handle} className="space-y-4 mt-6">
@@ -88,8 +90,8 @@ function AuthPage() {
               </div>
             )}
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Label htmlFor="username">Usuário</Label>
+              <Input id="username" autoCapitalize="none" autoCorrect="off" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="ex: eyshilagomes" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Senha</Label>
