@@ -262,12 +262,18 @@ export type Database = {
           id: string
           min_stock: number
           name: string
+          other_costs: number
+          packaging_cost: number
           photo_url: string | null
           price: number
+          price_shopee: number | null
+          price_site: number | null
+          price_tiktok: number | null
           sku: string | null
           status: Database["public"]["Enums"]["product_status"]
           stock: number
           supplier_id: string | null
+          target_margin: number
           updated_at: string
         }
         Insert: {
@@ -281,12 +287,18 @@ export type Database = {
           id?: string
           min_stock?: number
           name: string
+          other_costs?: number
+          packaging_cost?: number
           photo_url?: string | null
           price?: number
+          price_shopee?: number | null
+          price_site?: number | null
+          price_tiktok?: number | null
           sku?: string | null
           status?: Database["public"]["Enums"]["product_status"]
           stock?: number
           supplier_id?: string | null
+          target_margin?: number
           updated_at?: string
         }
         Update: {
@@ -300,12 +312,18 @@ export type Database = {
           id?: string
           min_stock?: number
           name?: string
+          other_costs?: number
+          packaging_cost?: number
           photo_url?: string | null
           price?: number
+          price_shopee?: number | null
+          price_site?: number | null
+          price_tiktok?: number | null
           sku?: string | null
           status?: Database["public"]["Enums"]["product_status"]
           stock?: number
           supplier_id?: string | null
+          target_margin?: number
           updated_at?: string
         }
         Relationships: [
