@@ -36,3 +36,16 @@ export function calcAllPrices(cost: number, packaging: number, other: number, ma
     tiktok: calcPrice(cost, packaging, other, marginPct, "tiktok"),
   };
 }
+
+/**
+ * Calcula a margem (em %) implícita quando o preço de venda de um canal é informado manualmente.
+ * Fórmula: margem = 1 − comissão − custo_total / preço
+ * Retorna null se o preço for inválido (≤ 0).
+ */
+export function marginFromPrice(price: number, cost: number, packaging: number, other: number, channel: Channel): number | null {
+  const p = Number(price || 0);
+  if (p <= 0) return null;
+  const ct = totalCost(cost, packaging, other);
+  const m = 1 - CHANNEL_FEES[channel] - ct / p;
+  return Math.round(m * 1000) / 10; // ex: 0.3025 -> 30.3
+}

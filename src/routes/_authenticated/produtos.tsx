@@ -11,11 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Layers, Trash2, Upload, Download } from "lucide-react";
+import { Plus, Search, Layers, Trash2, Upload, Download, Pencil } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { brl } from "@/lib/format";
-import { calcAllPrices, CHANNEL_FEES, CHANNEL_LABEL, totalCost } from "@/lib/pricing";
+import { calcAllPrices, calcPrice, marginFromPrice, CHANNEL_FEES, CHANNEL_LABEL, totalCost, type Channel } from "@/lib/pricing";
 import * as XLSX from "xlsx";
 
 export const Route = createFileRoute("/_authenticated/produtos")({
@@ -28,11 +28,13 @@ type Form = {
   photo_url: string; cost: string; packaging_cost: string; other_costs: string; target_margin: string;
   stock: string; min_stock: string;
   has_variants: boolean;
+  price_site: string; price_shopee: string; price_tiktok: string;
 };
 const empty: Form = {
   name: "", sku: "", category: "", brand: "", supplier_id: "", photo_url: "",
   cost: "0", packaging_cost: "0", other_costs: "0", target_margin: "30",
   stock: "0", min_stock: "0", has_variants: false,
+  price_site: "", price_shopee: "", price_tiktok: "",
 };
 
 function Page() {
@@ -42,6 +44,7 @@ function Page() {
   const [search, setSearch] = useState("");
   const [variantsFor, setVariantsFor] = useState<{ id: string; name: string } | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const { data } = useQuery({
     queryKey: ["products"],
@@ -59,27 +62,25 @@ function Page() {
     queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
   });
 
+  const buildPayload = (f: Form) => ({
+    name: f.name, sku: f.sku || null, category: f.category || null, brand: f.brand || null,
+    supplier_id: f.supplier_id || null, photo_url: f.photo_url || null,
+    cost: Number(f.cost || 0),
+    packaging_cost: Number(f.packaging_cost || 0),
+    other_costs: Number(f.other_costs || 0),
+    target_margin: Number(f.target_margin || 0),
+    stock: f.has_variants ? 0 : Number(f.stock || 0),
+    min_stock: f.has_variants ? 0 : Number(f.min_stock || 0),
+    has_variants: f.has_variants,
+    price_site: f.price_site === "" ? null : Number(f.price_site),
+    price_shopee: f.price_shopee === "" ? null : Number(f.price_shopee),
+    price_tiktok: f.price_tiktok === "" ? null : Number(f.price_tiktok),
+    price: f.price_site === "" ? Number(f.cost || 0) : Number(f.price_site),
+  });
+
   const create = useMutation({
     mutationFn: async (f: Form) => {
-      const payload: any = {
-        name: f.name, sku: f.sku || null, category: f.category || null, brand: f.brand || null,
-        supplier_id: f.supplier_id || null, photo_url: f.photo_url || null,
-        cost: Number(f.cost || 0),
-        packaging_cost: Number(f.packaging_cost || 0),
-        other_costs: Number(f.other_costs || 0),
-        target_margin: Number(f.target_margin || 0),
-        stock: f.has_variants ? 0 : Number(f.stock || 0),
-        min_stock: f.has_variants ? 0 : Number(f.min_stock || 0),
-        has_variants: f.has_variants,
-      };
-      const prices = calcAllPrices(
-        Number(f.cost || 0), Number(f.packaging_cost || 0), Number(f.other_costs || 0), Number(f.target_margin || 0),
-      );
-      payload.price_site = prices.site;
-      payload.price_shopee = prices.shopee;
-      payload.price_tiktok = prices.tiktok;
-      payload.price = prices.site ?? Number(f.cost || 0);
-      const { data: p, error } = await supabase.from("products").insert(payload).select("id").single();
+      const { data: p, error } = await supabase.from("products").insert(buildPayload(f)).select("id").single();
       if (error) throw error;
       if (!f.has_variants && Number(f.stock) > 0) {
         await supabase.from("stock_movements").insert({
@@ -97,7 +98,48 @@ function Page() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const update = useMutation({
+    mutationFn: async ({ id, f, oldStock }: { id: string; f: Form; oldStock: number }) => {
+      const { error } = await supabase.from("products").update(buildPayload(f)).eq("id", id);
+      if (error) throw error;
+      if (!f.has_variants) {
+        const newStock = Number(f.stock || 0);
+        const diff = newStock - oldStock;
+        if (diff !== 0) {
+          await supabase.from("stock_movements").insert({
+            product_id: id,
+            movement_type: "ajuste",
+            quantity: Math.abs(diff),
+            reason: `Ajuste manual (${diff > 0 ? "+" : "−"}${Math.abs(diff)})`,
+          });
+        }
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["products"] });
+      toast.success("Produto atualizado!");
+      setEditingId(null); setForm(empty);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const openEdit = (p: any) => {
+    setForm({
+      name: p.name ?? "", sku: p.sku ?? "", category: p.category ?? "", brand: p.brand ?? "",
+      supplier_id: p.supplier_id ?? "", photo_url: p.photo_url ?? "",
+      cost: String(p.cost ?? 0), packaging_cost: String(p.packaging_cost ?? 0),
+      other_costs: String(p.other_costs ?? 0), target_margin: String(p.target_margin ?? 0),
+      stock: String(p.stock ?? 0), min_stock: String(p.min_stock ?? 0),
+      has_variants: !!p.has_variants,
+      price_site: p.price_site != null ? String(p.price_site) : "",
+      price_shopee: p.price_shopee != null ? String(p.price_shopee) : "",
+      price_tiktok: p.price_tiktok != null ? String(p.price_tiktok) : "",
+    });
+    setEditingId(p.id);
+  };
+
   const filtered = (data ?? []).filter((p: any) => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku?.toLowerCase().includes(search.toLowerCase()));
+  const editingProduct = editingId ? (data ?? []).find((p: any) => p.id === editingId) : null;
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -110,39 +152,13 @@ function Page() {
             <DialogTrigger asChild><Button className="bg-gradient-brand text-primary-foreground border-0 shadow-glow"><Plus className="h-4 w-4 mr-1" /> Novo produto</Button></DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader><DialogTitle>Novo produto</DialogTitle></DialogHeader>
-              <form onSubmit={(e) => { e.preventDefault(); create.mutate(form); }} className="grid grid-cols-2 gap-3 max-h-[70vh] overflow-y-auto pr-2">
-                <div className="col-span-2 space-y-1.5"><Label>Nome *</Label><Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>SKU</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Categoria</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Ex: Batom, Base…" /></div>
-                <div className="space-y-1.5"><Label>Marca</Label><Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Fornecedor</Label>
-                  <Select value={form.supplier_id} onValueChange={(v) => setForm({ ...form, supplier_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>{(suppliers ?? []).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-2 space-y-1.5"><Label>URL da foto</Label><Input value={form.photo_url} onChange={(e) => setForm({ ...form, photo_url: e.target.value })} placeholder="https://…" /></div>
-                <div className="space-y-1.5"><Label>Custo (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Embalagem (R$)</Label><Input type="number" step="0.01" value={form.packaging_cost} onChange={(e) => setForm({ ...form, packaging_cost: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Outros custos (R$)</Label><Input type="number" step="0.01" value={form.other_costs} onChange={(e) => setForm({ ...form, other_costs: e.target.value })} placeholder="Ex: brinde, etiqueta…" /></div>
-                <div className="space-y-1.5"><Label>Margem desejada (%)</Label><Input type="number" step="0.1" value={form.target_margin} onChange={(e) => setForm({ ...form, target_margin: e.target.value })} /></div>
-                <PricePreview cost={form.cost} packaging={form.packaging_cost} other={form.other_costs} margin={form.target_margin} />
-                <div className="col-span-2 flex items-start gap-2 rounded-md border border-border p-3 bg-muted/30">
-                  <Checkbox id="hv" checked={form.has_variants} onCheckedChange={(v) => setForm({ ...form, has_variants: Boolean(v) })} />
-                  <div className="space-y-1">
-                    <Label htmlFor="hv" className="cursor-pointer">Este produto tem variações (cor, tom, tamanho…)</Label>
-                    <p className="text-xs text-muted-foreground">O estoque será controlado por variante. Você cadastra as cores/tons na próxima etapa.</p>
-                  </div>
-                </div>
-                {!form.has_variants && <>
-                  <div className="space-y-1.5"><Label>Estoque inicial</Label><Input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} /></div>
-                  <div className="space-y-1.5"><Label>Estoque mínimo</Label><Input type="number" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: e.target.value })} /></div>
-                </>}
-                <div className="col-span-2 flex justify-end gap-2 mt-2">
-                  <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-                  <Button type="submit" disabled={create.isPending} className="bg-gradient-brand text-primary-foreground border-0">{create.isPending ? "Salvando…" : "Salvar"}</Button>
-                </div>
-              </form>
+              <ProductForm
+                form={form} setForm={setForm} suppliers={suppliers ?? []}
+                submitting={create.isPending} submitLabel="Salvar"
+                stockEditable={false}
+                onCancel={() => setOpen(false)}
+                onSubmit={() => create.mutate(form)}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -184,11 +200,16 @@ function Page() {
                     <Badge variant={low ? "destructive" : "secondary"} className="font-mono">{totalStock}{p.has_variants ? ` (total)` : low ? ` / mín ${p.min_stock}` : ""}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {p.has_variants && (
-                      <Button size="sm" variant="ghost" onClick={() => setVariantsFor({ id: p.id, name: p.name })}>
-                        <Layers className="h-4 w-4 mr-1" /> Variações
+                    <div className="flex justify-end gap-1">
+                      {p.has_variants && (
+                        <Button size="sm" variant="ghost" onClick={() => setVariantsFor({ id: p.id, name: p.name })}>
+                          <Layers className="h-4 w-4 mr-1" /> Variações
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>
+                        <Pencil className="h-4 w-4 mr-1" /> Editar
                       </Button>
-                    )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -199,30 +220,125 @@ function Page() {
 
       <VariantsDialog open={!!variantsFor} product={variantsFor} onClose={() => setVariantsFor(null)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
+      <Dialog open={!!editingId} onOpenChange={(v) => !v && (setEditingId(null), setForm(empty))}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Editar produto {editingProduct?.name ? `— ${editingProduct.name}` : ""}</DialogTitle></DialogHeader>
+          {editingProduct && (
+            <ProductForm
+              form={form} setForm={setForm} suppliers={suppliers ?? []}
+              submitting={update.isPending} submitLabel="Atualizar"
+              stockEditable={true}
+              onCancel={() => { setEditingId(null); setForm(empty); }}
+              onSubmit={() => update.mutate({ id: editingId!, f: form, oldStock: Number(editingProduct.stock ?? 0) })}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function PricePreview({ cost, packaging, other, margin }: { cost: string; packaging: string; other: string; margin: string }) {
-  const c = Number(cost || 0), pk = Number(packaging || 0), o = Number(other || 0), m = Number(margin || 0);
-  const ct = totalCost(c, pk, o);
-  const prices = calcAllPrices(c, pk, o, m);
+function ProductForm({
+  form, setForm, suppliers, submitting, submitLabel, stockEditable, onCancel, onSubmit,
+}: {
+  form: Form; setForm: (f: Form) => void; suppliers: any[];
+  submitting: boolean; submitLabel: string; stockEditable: boolean;
+  onCancel: () => void; onSubmit: () => void;
+}) {
+  // Quando custos ou margem mudam, recalcula os 3 preços.
+  const recalcFromMargin = (f: Form, marginStr: string): Form => {
+    const c = Number(f.cost || 0), pk = Number(f.packaging_cost || 0), o = Number(f.other_costs || 0);
+    const m = Number(marginStr || 0);
+    const prices = calcAllPrices(c, pk, o, m);
+    return {
+      ...f, target_margin: marginStr,
+      price_site: prices.site != null ? String(prices.site) : "",
+      price_shopee: prices.shopee != null ? String(prices.shopee) : "",
+      price_tiktok: prices.tiktok != null ? String(prices.tiktok) : "",
+    };
+  };
+
+  // Quando o usuário digita um preço de canal, recalcula a margem implícita
+  // e atualiza os preços dos OUTROS canais usando essa nova margem.
+  const onPriceChange = (channel: Channel, value: string) => {
+    const next: Form = { ...form, [`price_${channel}`]: value } as Form;
+    const price = Number(value || 0);
+    if (price > 0) {
+      const c = Number(form.cost || 0), pk = Number(form.packaging_cost || 0), o = Number(form.other_costs || 0);
+      const m = marginFromPrice(price, c, pk, o, channel);
+      if (m != null) {
+        next.target_margin = String(m);
+        (["site", "shopee", "tiktok"] as Channel[]).forEach((ch) => {
+          if (ch === channel) return;
+          const p = calcPrice(c, pk, o, m, ch);
+          (next as any)[`price_${ch}`] = p != null ? String(p) : "";
+        });
+      }
+    }
+    setForm(next);
+  };
+
+  const onCostChange = (key: "cost" | "packaging_cost" | "other_costs", value: string) => {
+    setForm(recalcFromMargin({ ...form, [key]: value }, form.target_margin));
+  };
+
+  const ct = totalCost(Number(form.cost || 0), Number(form.packaging_cost || 0), Number(form.other_costs || 0));
+
   return (
-    <div className="col-span-2 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">Custo total (custo + embalagem + outros)</span>
-        <span className="font-semibold">{brl(ct)}</span>
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="grid grid-cols-2 gap-3 max-h-[70vh] overflow-y-auto pr-2">
+      <div className="col-span-2 space-y-1.5"><Label>Nome *</Label><Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+      <div className="space-y-1.5"><Label>SKU</Label><Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
+      <div className="space-y-1.5"><Label>Categoria</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Ex: Batom, Base…" /></div>
+      <div className="space-y-1.5"><Label>Marca</Label><Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} /></div>
+      <div className="space-y-1.5"><Label>Fornecedor</Label>
+        <Select value={form.supplier_id} onValueChange={(v) => setForm({ ...form, supplier_id: v })}>
+          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+          <SelectContent>{suppliers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+        </Select>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        {(["site", "shopee", "tiktok"] as const).map((ch) => (
-          <div key={ch} className="rounded-md bg-background/70 p-2 border border-border">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{CHANNEL_LABEL[ch]} · {(CHANNEL_FEES[ch] * 100).toFixed(0)}%</div>
-            <div className="text-base font-bold text-gradient-brand">{prices[ch] != null ? brl(prices[ch]!) : "—"}</div>
-          </div>
-        ))}
+      <div className="col-span-2 space-y-1.5"><Label>URL da foto</Label><Input value={form.photo_url} onChange={(e) => setForm({ ...form, photo_url: e.target.value })} placeholder="https://…" /></div>
+      <div className="space-y-1.5"><Label>Custo (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={(e) => onCostChange("cost", e.target.value)} /></div>
+      <div className="space-y-1.5"><Label>Embalagem (R$)</Label><Input type="number" step="0.01" value={form.packaging_cost} onChange={(e) => onCostChange("packaging_cost", e.target.value)} /></div>
+      <div className="space-y-1.5"><Label>Outros custos (R$)</Label><Input type="number" step="0.01" value={form.other_costs} onChange={(e) => onCostChange("other_costs", e.target.value)} placeholder="Ex: brinde, etiqueta…" /></div>
+      <div className="space-y-1.5"><Label>Margem desejada (%)</Label><Input type="number" step="0.1" value={form.target_margin} onChange={(e) => setForm(recalcFromMargin(form, e.target.value))} /></div>
+
+      <div className="col-span-2 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">Custo total (custo + embalagem + outros)</span>
+          <span className="font-semibold">{brl(ct)}</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {(["site", "shopee", "tiktok"] as Channel[]).map((ch) => (
+            <div key={ch} className="rounded-md bg-background/70 p-2 border border-border space-y-1">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{CHANNEL_LABEL[ch]} · {(CHANNEL_FEES[ch] * 100).toFixed(0)}%</div>
+              <Input
+                type="number" step="0.01" className="h-8 font-semibold"
+                value={ch === "site" ? form.price_site : ch === "shopee" ? form.price_shopee : form.price_tiktok}
+                onChange={(e) => onPriceChange(ch, e.target.value)}
+                placeholder="0,00"
+              />
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted-foreground">Mexa na margem ou digite o preço final em qualquer canal — o outro lado é recalculado automaticamente.</p>
       </div>
-      <p className="text-[10px] text-muted-foreground">Preço sugerido = custo total ÷ (1 − comissão do canal − margem desejada).</p>
-    </div>
+
+      <div className="col-span-2 flex items-start gap-2 rounded-md border border-border p-3 bg-muted/30">
+        <Checkbox id="hv" checked={form.has_variants} onCheckedChange={(v) => setForm({ ...form, has_variants: Boolean(v) })} />
+        <div className="space-y-1">
+          <Label htmlFor="hv" className="cursor-pointer">Este produto tem variações (cor, tom, tamanho…)</Label>
+          <p className="text-xs text-muted-foreground">O estoque será controlado por variante.</p>
+        </div>
+      </div>
+      {!form.has_variants && <>
+        <div className="space-y-1.5"><Label>{stockEditable ? "Estoque atual" : "Estoque inicial"}</Label><Input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} /></div>
+        <div className="space-y-1.5"><Label>Estoque mínimo</Label><Input type="number" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: e.target.value })} /></div>
+      </>}
+      <div className="col-span-2 flex justify-end gap-2 mt-2">
+        <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
+        <Button type="submit" disabled={submitting} className="bg-gradient-brand text-primary-foreground border-0">{submitting ? "Salvando…" : submitLabel}</Button>
+      </div>
+    </form>
   );
 }
 
