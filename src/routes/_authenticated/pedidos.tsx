@@ -53,13 +53,20 @@ function Page() {
     },
   });
   const { data: customers } = useQuery({ queryKey: ["customers-min"], queryFn: async () => (await supabase.from("customers").select("id,name").order("name")).data ?? [] });
-  const { data: products } = useQuery({ queryKey: ["products-min-orders"], queryFn: async () => (await supabase.from("products").select("id,name,price,cost,stock,has_variants").order("name")).data ?? [] });
+  const { data: products } = useQuery({ queryKey: ["products-min-orders"], queryFn: async () => (await supabase.from("products").select("id,name,price,price_site,price_shopee,price_tiktok,cost,stock,has_variants").order("name")).data ?? [] });
   const { data: selVariants } = useQuery({
     enabled: !!selProduct,
     queryKey: ["variants-for-order", selProduct],
     queryFn: async () => (await supabase.from("product_variants").select("id,name,stock,extra_cost,extra_price").eq("product_id", selProduct).order("name")).data ?? [],
   });
   const selProductObj = (products ?? []).find((p: any) => p.id === selProduct);
+
+  const priceForChannel = (prod: any, ch: string): number => {
+    if (ch === "shopee") return Number(prod.price_shopee ?? prod.price ?? 0);
+    if (ch === "tiktok_shop") return Number(prod.price_tiktok ?? prod.price ?? 0);
+    // presencial, site, instagram, whatsapp, woocommerce, outros → preço do site
+    return Number(prod.price_site ?? prod.price ?? 0);
+  };
 
   const subtotal = useMemo(() => items.reduce((s, i) => s + i.quantity * i.unit_price, 0), [items]);
   const total = Math.max(0, subtotal - Number(discount || 0) + Number(shipping || 0));
@@ -71,7 +78,7 @@ function Page() {
     if (!qty || qty <= 0) return toast.error("Quantidade inválida");
     let variant_id: string | null = null;
     let variant_name: string | null = null;
-    let unit_price = Number(prod.price);
+    let unit_price = priceForChannel(prod, channel);
     let unit_cost = Number(prod.cost);
     if (prod.has_variants) {
       if (!selVariant) return toast.error("Selecione a variação");
@@ -159,7 +166,19 @@ function Page() {
                   </Select>
                 </div>
                 <div className="space-y-1.5"><Label>Canal *</Label>
-                  <Select value={channel} onValueChange={setChannel}>
+                  <Select value={channel} onValueChange={(v) => {
+                    setChannel(v);
+                    setItems((curr) => curr.map((it) => {
+                      const prod = (products ?? []).find((p: any) => p.id === it.product_id);
+                      if (!prod) return it;
+                      let unit_price = priceForChannel(prod, v);
+                      if (it.variant_id) {
+                        // best-effort: keep extra_price already embedded; recompute base only
+                        unit_price = priceForChannel(prod, v) + Math.max(0, it.unit_price - Number(prod.price ?? 0));
+                      }
+                      return { ...it, unit_price };
+                    }));
+                  }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{CHANNELS.map((c) => <SelectItem key={c} value={c}>{channelLabel(c)}</SelectItem>)}</SelectContent>
                   </Select>
@@ -188,7 +207,7 @@ function Page() {
                   <div className="flex gap-2 mt-2">
                     <Select value={selProduct} onValueChange={(v) => { setSelProduct(v); setSelVariant(""); }}>
                       <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione um produto" /></SelectTrigger>
-                      <SelectContent>{(products ?? []).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} — {brl(p.price)}{p.has_variants ? " (c/ variações)" : ` (est: ${p.stock})`}</SelectItem>)}</SelectContent>
+                      <SelectContent>{(products ?? []).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} — {brl(priceForChannel(p, channel))}{p.has_variants ? " (c/ variações)" : ` (est: ${p.stock})`}</SelectItem>)}</SelectContent>
                     </Select>
                     <Input type="number" min={1} value={selQty} onChange={(e) => setSelQty(e.target.value)} className="w-20" />
                     <Button type="button" onClick={addItem}><Plus className="h-4 w-4" /></Button>
