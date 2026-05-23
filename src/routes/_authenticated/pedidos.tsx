@@ -166,7 +166,19 @@ function Page() {
                   </Select>
                 </div>
                 <div className="space-y-1.5"><Label>Canal *</Label>
-                  <Select value={channel} onValueChange={setChannel}>
+                  <Select value={channel} onValueChange={(v) => {
+                    setChannel(v);
+                    setItems((curr) => curr.map((it) => {
+                      const prod = (products ?? []).find((p: any) => p.id === it.product_id);
+                      if (!prod) return it;
+                      let unit_price = priceForChannel(prod, v);
+                      if (it.variant_id) {
+                        // best-effort: keep extra_price already embedded; recompute base only
+                        unit_price = priceForChannel(prod, v) + Math.max(0, it.unit_price - Number(prod.price ?? 0));
+                      }
+                      return { ...it, unit_price };
+                    }));
+                  }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{CHANNELS.map((c) => <SelectItem key={c} value={c}>{channelLabel(c)}</SelectItem>)}</SelectContent>
                   </Select>
@@ -195,7 +207,7 @@ function Page() {
                   <div className="flex gap-2 mt-2">
                     <Select value={selProduct} onValueChange={(v) => { setSelProduct(v); setSelVariant(""); }}>
                       <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione um produto" /></SelectTrigger>
-                      <SelectContent>{(products ?? []).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} — {brl(p.price)}{p.has_variants ? " (c/ variações)" : ` (est: ${p.stock})`}</SelectItem>)}</SelectContent>
+                      <SelectContent>{(products ?? []).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} — {brl(priceForChannel(p, channel))}{p.has_variants ? " (c/ variações)" : ` (est: ${p.stock})`}</SelectItem>)}</SelectContent>
                     </Select>
                     <Input type="number" min={1} value={selQty} onChange={(e) => setSelQty(e.target.value)} className="w-20" />
                     <Button type="button" onClick={addItem}><Plus className="h-4 w-4" /></Button>
