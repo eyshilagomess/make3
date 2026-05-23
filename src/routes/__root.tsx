@@ -78,9 +78,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Plataforma de gestão da Make 3: pedidos, estoque, clientes e financeiro em um só lugar." },
       { name: "author", content: "Make 3" },
       { property: "og:title", content: "Make 3 — Gestão" },
-      { property: "og:description", content: "Plataforma de gestão da Make 3." },
+      { property: "og:description", content: "Plataforma de gestão da Make 3: pedidos, estoque, clientes e financeiro em um só lugar." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "Make 3 — Gestão" },
+      { name: "twitter:description", content: "Plataforma de gestão da Make 3: pedidos, estoque, clientes e financeiro em um só lugar." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/f13fc860-6c04-4281-843e-2a2b4659b20e/id-preview-098451e1--977e57c6-87e3-4f99-a2a7-a59e8b4db58f.lovable.app-1779569396394.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/f13fc860-6c04-4281-843e-2a2b4659b20e/id-preview-098451e1--977e57c6-87e3-4f99-a2a7-a59e8b4db58f.lovable.app-1779569396394.png" },
     ],
     links: [
       {
