@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Layers, Trash2, Upload, Download, Pencil } from "lucide-react";
+import { Plus, Search, Layers, Trash2, Upload, Download, Pencil, Check, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { brl } from "@/lib/format";
@@ -438,6 +438,8 @@ const vEmpty: VForm = { name: "", sku: "", stock: "0", min_stock: "0", extra_cos
 function VariantsDialog({ open, product, onClose }: { open: boolean; product: { id: string; name: string } | null; onClose: () => void }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<VForm>(vEmpty);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<VForm>(vEmpty);
 
   const { data: variants } = useQuery({
     enabled: !!product?.id,
@@ -483,6 +485,46 @@ function VariantsDialog({ open, product, onClose }: { open: boolean; product: { 
     onError: (e: any) => toast.error(e.message),
   });
 
+  const update = useMutation({
+    mutationFn: async ({ id, oldStock }: { id: string; oldStock: number }) => {
+      if (!product || !editForm.name.trim()) throw new Error("Informe o nome da variação");
+      const newStock = Number(editForm.stock || 0);
+      const { error } = await supabase.from("product_variants").update({
+        name: editForm.name.trim(),
+        sku: editForm.sku || null,
+        stock: newStock,
+        min_stock: Number(editForm.min_stock || 0),
+        extra_cost: Number(editForm.extra_cost || 0),
+        extra_price: Number(editForm.extra_price || 0),
+      }).eq("id", id);
+      if (error) throw error;
+      const diff = newStock - oldStock;
+      if (diff !== 0) {
+        await supabase.from("stock_movements").insert({
+          product_id: product.id, variant_id: id,
+          movement_type: "ajuste", quantity: Math.abs(diff),
+          reason: `Ajuste manual (${diff > 0 ? "+" : "−"}${Math.abs(diff)})`,
+        });
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["variants", product?.id] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      setEditingId(null); setEditForm(vEmpty);
+      toast.success("Variação atualizada");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const startEdit = (v: any) => {
+    setEditingId(v.id);
+    setEditForm({
+      name: v.name ?? "", sku: v.sku ?? "",
+      stock: String(v.stock ?? 0), min_stock: String(v.min_stock ?? 0),
+      extra_cost: String(v.extra_cost ?? 0), extra_price: String(v.extra_price ?? 0),
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-2xl">
@@ -503,18 +545,43 @@ function VariantsDialog({ open, product, onClose }: { open: boolean; product: { 
           </div>
 
           <Table>
-            <TableHeader><TableRow><TableHead>Variação</TableHead><TableHead>SKU</TableHead><TableHead>Estoque</TableHead><TableHead>Ajuste preço</TableHead><TableHead></TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Variação</TableHead><TableHead>SKU</TableHead><TableHead>Estoque</TableHead><TableHead>Mín.</TableHead><TableHead>+ custo</TableHead><TableHead>+ preço</TableHead><TableHead></TableHead></TableRow></TableHeader>
             <TableBody>
-              {(variants ?? []).length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6 text-sm">Nenhuma variação ainda.</TableCell></TableRow>}
+              {(variants ?? []).length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6 text-sm">Nenhuma variação ainda.</TableCell></TableRow>}
               {(variants ?? []).map((v: any) => {
                 const low = v.stock <= v.min_stock;
+                if (editingId === v.id) {
+                  return (
+                    <TableRow key={v.id} className="bg-muted/30">
+                      <TableCell><Input className="h-8" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></TableCell>
+                      <TableCell><Input className="h-8 font-mono text-xs" value={editForm.sku} onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })} /></TableCell>
+                      <TableCell><Input className="h-8 w-20" type="number" value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })} /></TableCell>
+                      <TableCell><Input className="h-8 w-16" type="number" value={editForm.min_stock} onChange={(e) => setEditForm({ ...editForm, min_stock: e.target.value })} /></TableCell>
+                      <TableCell><Input className="h-8 w-20" type="number" step="0.01" value={editForm.extra_cost} onChange={(e) => setEditForm({ ...editForm, extra_cost: e.target.value })} /></TableCell>
+                      <TableCell><Input className="h-8 w-20" type="number" step="0.01" value={editForm.extra_price} onChange={(e) => setEditForm({ ...editForm, extra_price: e.target.value })} /></TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => update.mutate({ id: v.id, oldStock: Number(v.stock ?? 0) })} disabled={update.isPending}><Check className="h-4 w-4 text-primary" /></Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setEditingId(null); setEditForm(vEmpty); }}><X className="h-4 w-4" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }
                 return (
                   <TableRow key={v.id}>
                     <TableCell className="font-medium">{v.name}</TableCell>
                     <TableCell className="font-mono text-xs">{v.sku ?? "—"}</TableCell>
                     <TableCell><Badge variant={low ? "destructive" : "secondary"} className="font-mono">{v.stock}</Badge></TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{v.min_stock}</TableCell>
+                    <TableCell className="text-sm">{Number(v.extra_cost) ? `+${brl(v.extra_cost)}` : "—"}</TableCell>
                     <TableCell className="text-sm">{Number(v.extra_price) ? `+${brl(v.extra_price)}` : "—"}</TableCell>
-                    <TableCell className="text-right"><button onClick={() => remove.mutate(v.id)}><Trash2 className="h-4 w-4 text-destructive" /></button></TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(v)}><Pencil className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => remove.mutate(v.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })}
