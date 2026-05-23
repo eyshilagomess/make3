@@ -33,15 +33,26 @@ function Page() {
   const { data: movements } = useQuery({
     queryKey: ["movements"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("stock_movements").select("*, products(name, sku)").order("created_at", { ascending: false }).limit(100);
+      const { data, error } = await supabase
+        .from("stock_movements")
+        .select("*, products(name, sku), product_variants(name)")
+        .order("created_at", { ascending: false })
+        .limit(100);
       if (error) throw error;
       return data;
     },
   });
   const { data: products } = useQuery({
     queryKey: ["products-min"],
-    queryFn: async () => (await supabase.from("products").select("id,name,stock").order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("products").select("id,name,stock,has_variants").order("name")).data ?? [],
   });
+  const [variantId, setVariantId] = useState("");
+  const { data: variants } = useQuery({
+    enabled: !!productId,
+    queryKey: ["variants-for-product", productId],
+    queryFn: async () => (await supabase.from("product_variants").select("id,name,stock").eq("product_id", productId).order("name")).data ?? [],
+  });
+  const selectedProduct = (products ?? []).find((p: any) => p.id === productId);
 
   const create = useMutation({
     mutationFn: async () => {
@@ -50,22 +61,38 @@ function Page() {
       if (!qty || qty <= 0) throw new Error("Quantidade inválida");
       const product = (products ?? []).find((p: any) => p.id === productId);
       const delta = POSITIVE.has(type) ? qty : -qty;
-      const newStock = (product?.stock ?? 0) + delta;
-      if (newStock < 0) throw new Error("Estoque insuficiente");
-      const { error: e1 } = await supabase.from("stock_movements").insert({
-        product_id: productId, movement_type: type as any, quantity: qty, reason,
-      });
-      if (e1) throw e1;
-      const { error: e2 } = await supabase.from("products").update({ stock: newStock }).eq("id", productId);
-      if (e2) throw e2;
+
+      if (product?.has_variants) {
+        if (!variantId) throw new Error("Selecione a variação");
+        const v = (variants ?? []).find((x: any) => x.id === variantId);
+        const newStock = (v?.stock ?? 0) + delta;
+        if (newStock < 0) throw new Error("Estoque insuficiente");
+        const { error: e1 } = await supabase.from("stock_movements").insert({
+          product_id: productId, variant_id: variantId, movement_type: type as any, quantity: qty, reason,
+        });
+        if (e1) throw e1;
+        const { error: e2 } = await supabase.from("product_variants").update({ stock: newStock }).eq("id", variantId);
+        if (e2) throw e2;
+      } else {
+        const newStock = (product?.stock ?? 0) + delta;
+        if (newStock < 0) throw new Error("Estoque insuficiente");
+        const { error: e1 } = await supabase.from("stock_movements").insert({
+          product_id: productId, movement_type: type as any, quantity: qty, reason,
+        });
+        if (e1) throw e1;
+        const { error: e2 } = await supabase.from("products").update({ stock: newStock }).eq("id", productId);
+        if (e2) throw e2;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["movements"] });
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["products-min"] });
+      qc.invalidateQueries({ queryKey: ["variants-for-product"] });
+      qc.invalidateQueries({ queryKey: ["variants"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       toast.success("Movimentação registrada!");
-      setOpen(false); setProductId(""); setType("entrada"); setQuantity("1"); setReason("");
+      setOpen(false); setProductId(""); setVariantId(""); setType("entrada"); setQuantity("1"); setReason("");
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -80,11 +107,19 @@ function Page() {
               <DialogHeader><DialogTitle>Nova movimentação</DialogTitle></DialogHeader>
               <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="space-y-3">
                 <div className="space-y-1.5"><Label>Produto *</Label>
-                  <Select value={productId} onValueChange={setProductId}>
+                  <Select value={productId} onValueChange={(v) => { setProductId(v); setVariantId(""); }}>
                     <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>{(products ?? []).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} (estoque: {p.stock})</SelectItem>)}</SelectContent>
+                    <SelectContent>{(products ?? []).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}{p.has_variants ? " (c/ variações)" : ` (estoque: ${p.stock})`}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
+                {selectedProduct?.has_variants && (
+                  <div className="space-y-1.5"><Label>Variação *</Label>
+                    <Select value={variantId} onValueChange={setVariantId}>
+                      <SelectTrigger><SelectValue placeholder="Selecione a variação" /></SelectTrigger>
+                      <SelectContent>{(variants ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name} (estoque: {v.stock})</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5"><Label>Tipo *</Label>
                     <Select value={type} onValueChange={setType}>
@@ -115,7 +150,7 @@ function Page() {
               return (
                 <TableRow key={m.id}>
                   <TableCell className="text-sm">{dateTimeBR(m.created_at)}</TableCell>
-                  <TableCell className="font-medium">{m.products?.name ?? "—"}</TableCell>
+                  <TableCell className="font-medium">{m.products?.name ?? "—"}{m.product_variants?.name && <span className="text-xs text-muted-foreground ml-1">· {m.product_variants.name}</span>}</TableCell>
                   <TableCell><Badge variant={positive ? "secondary" : "outline"}>{movementTypeLabel(m.movement_type)}</Badge></TableCell>
                   <TableCell className={`font-mono ${positive ? "text-success" : "text-destructive"}`}>{positive ? "+" : "−"}{m.quantity}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{m.reason ?? "—"}</TableCell>

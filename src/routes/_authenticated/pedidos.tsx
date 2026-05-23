@@ -25,7 +25,7 @@ export const Route = createFileRoute("/_authenticated/pedidos")({
   component: Page,
 });
 
-type Item = { product_id: string; product_name: string; quantity: number; unit_price: number; unit_cost: number };
+type Item = { product_id: string; product_name: string; variant_id: string | null; variant_name: string | null; quantity: number; unit_price: number; unit_cost: number };
 
 function Page() {
   const { user } = useAuth();
@@ -41,6 +41,7 @@ function Page() {
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [selProduct, setSelProduct] = useState("");
+  const [selVariant, setSelVariant] = useState("");
   const [selQty, setSelQty] = useState("1");
 
   const { data: orders } = useQuery({
@@ -52,7 +53,13 @@ function Page() {
     },
   });
   const { data: customers } = useQuery({ queryKey: ["customers-min"], queryFn: async () => (await supabase.from("customers").select("id,name").order("name")).data ?? [] });
-  const { data: products } = useQuery({ queryKey: ["products-min-orders"], queryFn: async () => (await supabase.from("products").select("id,name,price,cost,stock").order("name")).data ?? [] });
+  const { data: products } = useQuery({ queryKey: ["products-min-orders"], queryFn: async () => (await supabase.from("products").select("id,name,price,cost,stock,has_variants").order("name")).data ?? [] });
+  const { data: selVariants } = useQuery({
+    enabled: !!selProduct,
+    queryKey: ["variants-for-order", selProduct],
+    queryFn: async () => (await supabase.from("product_variants").select("id,name,stock,extra_cost,extra_price").eq("product_id", selProduct).order("name")).data ?? [],
+  });
+  const selProductObj = (products ?? []).find((p: any) => p.id === selProduct);
 
   const subtotal = useMemo(() => items.reduce((s, i) => s + i.quantity * i.unit_price, 0), [items]);
   const total = Math.max(0, subtotal - Number(discount || 0) + Number(shipping || 0));
@@ -62,8 +69,21 @@ function Page() {
     if (!prod) return toast.error("Selecione um produto");
     const qty = Number(selQty);
     if (!qty || qty <= 0) return toast.error("Quantidade inválida");
-    setItems([...items, { product_id: prod.id, product_name: prod.name, quantity: qty, unit_price: Number(prod.price), unit_cost: Number(prod.cost) }]);
-    setSelProduct(""); setSelQty("1");
+    let variant_id: string | null = null;
+    let variant_name: string | null = null;
+    let unit_price = Number(prod.price);
+    let unit_cost = Number(prod.cost);
+    if (prod.has_variants) {
+      if (!selVariant) return toast.error("Selecione a variação");
+      const v = (selVariants ?? []).find((x: any) => x.id === selVariant);
+      if (!v) return toast.error("Variação não encontrada");
+      variant_id = v.id;
+      variant_name = v.name;
+      unit_price += Number(v.extra_price || 0);
+      unit_cost += Number(v.extra_cost || 0);
+    }
+    setItems([...items, { product_id: prod.id, product_name: prod.name, variant_id, variant_name, quantity: qty, unit_price, unit_cost }]);
+    setSelProduct(""); setSelVariant(""); setSelQty("1");
   };
 
   const reset = () => {
@@ -89,6 +109,7 @@ function Page() {
 
       const itemsPayload = items.map((i) => ({
         order_id: order.id, product_id: i.product_id, product_name: i.product_name,
+        variant_id: i.variant_id, variant_name: i.variant_name,
         quantity: i.quantity, unit_price: i.unit_price, unit_cost: i.unit_cost,
         subtotal: i.quantity * i.unit_price,
       }));
@@ -97,13 +118,19 @@ function Page() {
 
       // Stock movements + decrement stock
       for (const i of items) {
-        const prod = (products ?? []).find((p: any) => p.id === i.product_id);
-        if (!prod) continue;
         await supabase.from("stock_movements").insert({
-          product_id: i.product_id, movement_type: "saida", quantity: i.quantity,
+          product_id: i.product_id, variant_id: i.variant_id, movement_type: "saida", quantity: i.quantity,
           reason: `Pedido`, reference_order_id: order.id,
         });
-        await supabase.from("products").update({ stock: Math.max(0, prod.stock - i.quantity) }).eq("id", i.product_id);
+        if (i.variant_id) {
+          const { data: v } = await supabase.from("product_variants").select("stock").eq("id", i.variant_id).single();
+          await supabase.from("product_variants").update({ stock: Math.max(0, (v?.stock ?? 0) - i.quantity) }).eq("id", i.variant_id);
+        } else {
+          const prod = (products ?? []).find((p: any) => p.id === i.product_id);
+          if (prod) {
+            await supabase.from("products").update({ stock: Math.max(0, prod.stock - i.quantity) }).eq("id", i.product_id);
+          }
+        }
       }
     },
     onSuccess: () => {
@@ -159,18 +186,26 @@ function Page() {
                 <div className="col-span-2 border border-border rounded-lg p-3">
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">Produtos</Label>
                   <div className="flex gap-2 mt-2">
-                    <Select value={selProduct} onValueChange={setSelProduct}>
+                    <Select value={selProduct} onValueChange={(v) => { setSelProduct(v); setSelVariant(""); }}>
                       <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione um produto" /></SelectTrigger>
-                      <SelectContent>{(products ?? []).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} — {brl(p.price)} (est: {p.stock})</SelectItem>)}</SelectContent>
+                      <SelectContent>{(products ?? []).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} — {brl(p.price)}{p.has_variants ? " (c/ variações)" : ` (est: ${p.stock})`}</SelectItem>)}</SelectContent>
                     </Select>
                     <Input type="number" min={1} value={selQty} onChange={(e) => setSelQty(e.target.value)} className="w-20" />
                     <Button type="button" onClick={addItem}><Plus className="h-4 w-4" /></Button>
                   </div>
+                  {selProductObj?.has_variants && (
+                    <div className="mt-2">
+                      <Select value={selVariant} onValueChange={setSelVariant}>
+                        <SelectTrigger><SelectValue placeholder="Selecione a variação" /></SelectTrigger>
+                        <SelectContent>{(selVariants ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name} (est: {v.stock}){Number(v.extra_price) ? ` · +${brl(v.extra_price)}` : ""}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="mt-3 space-y-1">
                     {items.length === 0 && <p className="text-xs text-muted-foreground py-2">Nenhum item.</p>}
                     {items.map((i, idx) => (
                       <div key={idx} className="flex items-center justify-between text-sm bg-muted/40 rounded p-2">
-                        <span>{i.quantity}× {i.product_name}</span>
+                        <span>{i.quantity}× {i.product_name}{i.variant_name ? ` — ${i.variant_name}` : ""}</span>
                         <div className="flex items-center gap-3">
                           <span className="font-semibold">{brl(i.quantity * i.unit_price)}</span>
                           <button type="button" onClick={() => setItems(items.filter((_, j) => j !== idx))}><Trash2 className="h-3.5 w-3.5 text-destructive" /></button>
