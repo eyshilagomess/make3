@@ -41,6 +41,7 @@ function Page() {
   const [form, setForm] = useState<Form>(empty);
   const [search, setSearch] = useState("");
   const [variantsFor, setVariantsFor] = useState<{ id: string; name: string } | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data } = useQuery({
     queryKey: ["products"],
@@ -102,6 +103,9 @@ function Page() {
     <div className="p-8 max-w-7xl mx-auto">
       <PageHeader title="Produtos" subtitle="Catálogo e controle de estoque"
         actions={
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={downloadTemplate}><Download className="h-4 w-4 mr-1" /> Modelo</Button>
+          <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-1" /> Importar</Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button className="bg-gradient-brand text-primary-foreground border-0 shadow-glow"><Plus className="h-4 w-4 mr-1" /> Novo produto</Button></DialogTrigger>
             <DialogContent className="max-w-2xl">
@@ -141,6 +145,7 @@ function Page() {
               </form>
             </DialogContent>
           </Dialog>
+        </div>
         }
       />
 
@@ -150,14 +155,15 @@ function Page() {
           <Input placeholder="Buscar por nome ou SKU…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
         </div>
         <Table>
-          <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>SKU</TableHead><TableHead>Marca</TableHead><TableHead>Custo</TableHead><TableHead>Preço</TableHead><TableHead>Estoque</TableHead><TableHead></TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>SKU</TableHead><TableHead>Custo total</TableHead><TableHead>Site</TableHead><TableHead>Shopee</TableHead><TableHead>TikTok</TableHead><TableHead>Estoque</TableHead><TableHead></TableHead></TableRow></TableHeader>
           <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
             {filtered.map((p: any) => {
               const variants = p.product_variants ?? [];
               const totalStock = p.has_variants ? variants.reduce((s: number, v: any) => s + (v.stock ?? 0), 0) : p.stock;
               const lowVariant = p.has_variants && variants.some((v: any) => (v.stock ?? 0) <= (v.min_stock ?? 0));
               const low = p.has_variants ? lowVariant : p.stock <= p.min_stock;
+              const ct = totalCost(p.cost, p.packaging_cost, p.other_costs);
               return (
                 <TableRow key={p.id}>
                   <TableCell>
@@ -165,14 +171,15 @@ function Page() {
                       {p.photo_url ? <img src={p.photo_url} alt="" className="h-9 w-9 rounded-md object-cover" /> : <div className="h-9 w-9 rounded-md bg-muted" />}
                       <div>
                         <div className="font-medium flex items-center gap-2">{p.name}{p.has_variants && <Badge variant="outline" className="text-[10px] py-0">{variants.length} var.</Badge>}</div>
-                        <div className="text-xs text-muted-foreground">{p.category ?? ""} {p.suppliers?.name ? `· ${p.suppliers.name}` : ""}</div>
+                        <div className="text-xs text-muted-foreground">{p.brand ? `${p.brand} · ` : ""}{p.category ?? ""}{p.suppliers?.name ? ` · ${p.suppliers.name}` : ""}</div>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{p.sku ?? "—"}</TableCell>
-                  <TableCell>{p.brand ?? "—"}</TableCell>
-                  <TableCell>{brl(p.cost)}</TableCell>
-                  <TableCell className="font-semibold">{brl(p.price)}</TableCell>
+                  <TableCell className="text-sm">{brl(ct)}<div className="text-[10px] text-muted-foreground">margem {Number(p.target_margin ?? 0)}%</div></TableCell>
+                  <TableCell className="font-semibold">{p.price_site != null ? brl(p.price_site) : "—"}</TableCell>
+                  <TableCell className="font-semibold">{p.price_shopee != null ? brl(p.price_shopee) : "—"}</TableCell>
+                  <TableCell className="font-semibold">{p.price_tiktok != null ? brl(p.price_tiktok) : "—"}</TableCell>
                   <TableCell>
                     <Badge variant={low ? "destructive" : "secondary"} className="font-mono">{totalStock}{p.has_variants ? ` (total)` : low ? ` / mín ${p.min_stock}` : ""}</Badge>
                   </TableCell>
@@ -191,7 +198,121 @@ function Page() {
       </Card>
 
       <VariantsDialog open={!!variantsFor} product={variantsFor} onClose={() => setVariantsFor(null)} />
+      <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
     </div>
+  );
+}
+
+function PricePreview({ cost, packaging, other, margin }: { cost: string; packaging: string; other: string; margin: string }) {
+  const c = Number(cost || 0), pk = Number(packaging || 0), o = Number(other || 0), m = Number(margin || 0);
+  const ct = totalCost(c, pk, o);
+  const prices = calcAllPrices(c, pk, o, m);
+  return (
+    <div className="col-span-2 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">Custo total (custo + embalagem + outros)</span>
+        <span className="font-semibold">{brl(ct)}</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {(["site", "shopee", "tiktok"] as const).map((ch) => (
+          <div key={ch} className="rounded-md bg-background/70 p-2 border border-border">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{CHANNEL_LABEL[ch]} · {(CHANNEL_FEES[ch] * 100).toFixed(0)}%</div>
+            <div className="text-base font-bold text-gradient-brand">{prices[ch] != null ? brl(prices[ch]!) : "—"}</div>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-muted-foreground">Preço sugerido = custo total ÷ (1 − comissão do canal − margem desejada).</p>
+    </div>
+  );
+}
+
+const TEMPLATE_HEADERS = ["name", "sku", "category", "brand", "cost", "packaging_cost", "other_costs", "target_margin", "min_stock", "has_variants"];
+function downloadTemplate() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    TEMPLATE_HEADERS,
+    ["Base Líquida Make 3", "BASE-001", "Base", "Make 3", 18.5, 2.0, 0.5, 30, 5, "nao"],
+    ["Batom Matte Vermelho", "BAT-002", "Batom", "Make 3", 7.0, 1.0, 0, 35, 3, "nao"],
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "produtos");
+  XLSX.writeFile(wb, "modelo_precificacao_make3.xlsx");
+}
+
+function ImportDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const [rows, setRows] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  const onFile = async (file: File) => {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json<any>(sheet, { defval: "" });
+    setRows(data);
+  };
+
+  const importAll = async () => {
+    if (rows.length === 0) return toast.error("Carregue um arquivo primeiro");
+    setBusy(true);
+    try {
+      const payload = rows.map((r) => {
+        const cost = Number(r.cost || 0);
+        const pk = Number(r.packaging_cost || 0);
+        const oc = Number(r.other_costs || 0);
+        const m = Number(r.target_margin || 0);
+        const prices = calcAllPrices(cost, pk, oc, m);
+        return {
+          name: String(r.name || "").trim(),
+          sku: r.sku ? String(r.sku) : null,
+          category: r.category ? String(r.category) : null,
+          brand: r.brand ? String(r.brand) : null,
+          cost, packaging_cost: pk, other_costs: oc, target_margin: m,
+          price: prices.site ?? cost,
+          price_site: prices.site, price_shopee: prices.shopee, price_tiktok: prices.tiktok,
+          min_stock: Number(r.min_stock || 0),
+          has_variants: ["sim", "yes", "true", "1"].includes(String(r.has_variants ?? "").toLowerCase().trim()),
+        };
+      }).filter((p) => p.name);
+      if (payload.length === 0) throw new Error("Nenhuma linha válida (coluna 'name' vazia)");
+      const { error } = await supabase.from("products").insert(payload);
+      if (error) throw error;
+      toast.success(`${payload.length} produto(s) importado(s)!`);
+      setRows([]); onDone(); onClose();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Importar planilha de precificação</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Aceita .xlsx ou .csv. Use o botão <strong>Modelo</strong> para baixar o padrão. Os preços por canal (Site, Shopee, TikTok) serão calculados automaticamente.
+          </p>
+          <Input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
+          {rows.length > 0 && (
+            <div className="rounded-md border border-border max-h-72 overflow-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted sticky top-0"><tr>{TEMPLATE_HEADERS.map((h) => <th key={h} className="p-2 text-left">{h}</th>)}</tr></thead>
+                <tbody>{rows.slice(0, 50).map((r, i) => (
+                  <tr key={i} className="border-t border-border">{TEMPLATE_HEADERS.map((h) => <td key={h} className="p-2">{String(r[h] ?? "")}</td>)}</tr>
+                ))}</tbody>
+              </table>
+              {rows.length > 50 && <div className="p-2 text-xs text-muted-foreground">+ {rows.length - 50} linhas</div>}
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            <Button onClick={importAll} disabled={busy || rows.length === 0} className="bg-gradient-brand text-primary-foreground border-0">
+              {busy ? "Importando…" : `Importar ${rows.length || ""}`}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
