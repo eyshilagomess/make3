@@ -123,6 +123,17 @@ function Page() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      // Apaga variantes e o produto (movimentos têm reference apenas pra pedido)
+      await supabase.from("product_variants").delete().eq("product_id", id);
+      const { error } = await supabase.from("products").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["products"] }); toast.success("Produto excluído"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const openEdit = (p: any) => {
     setForm({
       name: p.name ?? "", sku: p.sku ?? "", category: p.category ?? "", brand: p.brand ?? "",
@@ -208,6 +219,9 @@ function Page() {
                       )}
                       <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>
                         <Pencil className="h-4 w-4 mr-1" /> Editar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => { if (confirm(`Excluir "${p.name}"? Esta ação não pode ser desfeita.`)) remove.mutate(p.id); }}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </TableCell>
