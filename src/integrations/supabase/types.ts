@@ -129,12 +129,16 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_id: string | null
+          customer_name_freeform: string | null
           discount: number
           external_reference: string | null
           id: string
           notes: string | null
           order_code: string
+          payment_amount_1: number | null
+          payment_amount_2: number | null
           payment_method: Database["public"]["Enums"]["payment_method"] | null
+          payment_method_2: Database["public"]["Enums"]["payment_method"] | null
           payment_proof_url: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
           seller_id: string | null
@@ -149,12 +153,18 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
+          customer_name_freeform?: string | null
           discount?: number
           external_reference?: string | null
           id?: string
           notes?: string | null
           order_code?: string
+          payment_amount_1?: number | null
+          payment_amount_2?: number | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          payment_method_2?:
+            | Database["public"]["Enums"]["payment_method"]
+            | null
           payment_proof_url?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           seller_id?: string | null
@@ -169,12 +179,18 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
+          customer_name_freeform?: string | null
           discount?: number
           external_reference?: string | null
           id?: string
           notes?: string | null
           order_code?: string
+          payment_amount_1?: number | null
+          payment_amount_2?: number | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          payment_method_2?:
+            | Database["public"]["Enums"]["payment_method"]
+            | null
           payment_proof_url?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           seller_id?: string | null

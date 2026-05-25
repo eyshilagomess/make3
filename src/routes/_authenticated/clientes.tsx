@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { CHANNELS, channelLabel, dateBR } from "@/lib/format";
 
@@ -30,6 +30,7 @@ function Page() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty);
   const [search, setSearch] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const { data } = useQuery({
     queryKey: ["customers"],
@@ -54,6 +55,38 @@ function Page() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const update = useMutation({
+    mutationFn: async ({ id, f }: { id: string; f: Form }) => {
+      const payload: any = { ...f, birthdate: f.birthdate || null, origin_channel: f.origin_channel || null };
+      const { error } = await supabase.from("customers").update(payload).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      toast.success("Cliente atualizada!");
+      setEditingId(null); setOpen(false); setForm(empty);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("customers").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["customers"] }); toast.success("Cliente excluída"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const openEdit = (c: any) => {
+    setEditingId(c.id);
+    setForm({
+      name: c.name ?? "", phone: c.phone ?? "", email: c.email ?? "", instagram: c.instagram ?? "",
+      address: c.address ?? "", birthdate: c.birthdate ?? "", origin_channel: c.origin_channel ?? "", notes: c.notes ?? "",
+    });
+    setOpen(true);
+  };
+
   const filtered = (data ?? []).filter((c: any) =>
     !search || c.name?.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search) || c.email?.toLowerCase().includes(search.toLowerCase())
   );
@@ -64,13 +97,13 @@ function Page() {
         title="Clientes"
         subtitle="Base completa de clientes Make 3"
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditingId(null); setForm(empty); } }}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-brand text-primary-foreground border-0 shadow-glow"><Plus className="h-4 w-4 mr-1" /> Nova cliente</Button>
+              <Button className="bg-gradient-brand text-primary-foreground border-0 shadow-glow" onClick={() => { setEditingId(null); setForm(empty); }}><Plus className="h-4 w-4 mr-1" /> Nova cliente</Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
-              <DialogHeader><DialogTitle>Nova cliente</DialogTitle></DialogHeader>
-              <form onSubmit={(e) => { e.preventDefault(); create.mutate(form); }} className="grid grid-cols-2 gap-3">
+              <DialogHeader><DialogTitle>{editingId ? "Editar cliente" : "Nova cliente"}</DialogTitle></DialogHeader>
+              <form onSubmit={(e) => { e.preventDefault(); editingId ? update.mutate({ id: editingId, f: form }) : create.mutate(form); }} className="grid grid-cols-2 gap-3">
                 <div className="col-span-2 space-y-1.5"><Label>Nome *</Label><Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
                 <div className="space-y-1.5"><Label>Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
                 <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
@@ -85,8 +118,8 @@ function Page() {
                 </div>
                 <div className="col-span-2 space-y-1.5"><Label>Observações</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
                 <div className="col-span-2 flex justify-end gap-2 mt-2">
-                  <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-                  <Button type="submit" disabled={create.isPending} className="bg-gradient-brand text-primary-foreground border-0">{create.isPending ? "Salvando…" : "Salvar"}</Button>
+                  <Button type="button" variant="ghost" onClick={() => { setOpen(false); setEditingId(null); setForm(empty); }}>Cancelar</Button>
+                  <Button type="submit" disabled={create.isPending || update.isPending} className="bg-gradient-brand text-primary-foreground border-0">{(create.isPending || update.isPending) ? "Salvando…" : editingId ? "Atualizar" : "Salvar"}</Button>
                 </div>
               </form>
             </DialogContent>
@@ -100,9 +133,9 @@ function Page() {
           <Input placeholder="Buscar por nome, telefone ou email…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
         </div>
         <Table>
-          <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Contato</TableHead><TableHead>Instagram</TableHead><TableHead>Canal</TableHead><TableHead>Aniversário</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Contato</TableHead><TableHead>Instagram</TableHead><TableHead>Canal</TableHead><TableHead>Aniversário</TableHead><TableHead></TableHead></TableRow></TableHeader>
           <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-12">Nenhuma cliente cadastrada.</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">Nenhuma cliente cadastrada.</TableCell></TableRow>}
             {filtered.map((c: any) => (
               <TableRow key={c.id}>
                 <TableCell className="font-medium">{c.name}</TableCell>
@@ -110,6 +143,12 @@ function Page() {
                 <TableCell>{c.instagram ?? "—"}</TableCell>
                 <TableCell>{channelLabel(c.origin_channel)}</TableCell>
                 <TableCell>{dateBR(c.birthdate)}</TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => { if (confirm(`Excluir cliente "${c.name}"?`)) remove.mutate(c.id); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
