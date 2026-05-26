@@ -125,6 +125,14 @@ function Page() {
 
   const reset = () => { setForm(emptyForm); setEditingId(null); setProductQuery(""); setSelProduct(""); setSelVariant(""); setSelQty("1"); };
 
+  const openProof = async (ref: string) => {
+    if (!ref) return;
+    if (/^https?:\/\//i.test(ref)) { window.open(ref, "_blank", "noopener,noreferrer"); return; }
+    const { data, error } = await supabase.storage.from("payment-proofs").createSignedUrl(ref, 60);
+    if (error || !data?.signedUrl) { toast.error("Não foi possível abrir o comprovante"); return; }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+
   const uploadProof = async (file: File) => {
     setUploading(true);
     try {
