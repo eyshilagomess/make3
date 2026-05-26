@@ -132,8 +132,8 @@ function Page() {
       const path = `${user?.id || "anon"}/${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from("payment-proofs").upload(path, file, { upsert: false });
       if (error) throw error;
-      const { data } = supabase.storage.from("payment-proofs").getPublicUrl(path);
-      setForm((f) => ({ ...f, paymentProofUrl: data.publicUrl }));
+      // Store the storage path; we generate short-lived signed URLs on demand.
+      setForm((f) => ({ ...f, paymentProofUrl: path }));
       toast.success("Comprovante anexado");
     } catch (e: any) { toast.error(e.message); }
     finally { setUploading(false); }
