@@ -153,7 +153,7 @@ function Page() {
   const editingProduct = editingId ? (data ?? []).find((p: any) => p.id === editingId) : null;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
       <PageHeader title="Produtos" subtitle="Catálogo e controle de estoque"
         actions={
         <div className="flex flex-wrap gap-2">
