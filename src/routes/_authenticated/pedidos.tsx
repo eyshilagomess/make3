@@ -418,7 +418,7 @@ function Page() {
                       <Button type="button" variant="outline" size="sm" disabled={uploading} onClick={() => proofRef.current?.click()}>
                         <Upload className="h-3.5 w-3.5 mr-1" /> {uploading ? "Enviando…" : form.paymentProofUrl ? "Substituir" : "Anexar"}
                       </Button>
-                      {form.paymentProofUrl && <a href={form.paymentProofUrl} target="_blank" rel="noreferrer" className="text-xs text-primary underline self-center">Ver arquivo</a>}
+                      {form.paymentProofUrl && <button type="button" onClick={() => openProof(form.paymentProofUrl)} className="text-xs text-primary underline self-center">Ver arquivo</button>}
                     </div>
                   </div>
 
@@ -506,7 +506,7 @@ function Page() {
                   {paymentMethodLabel(o.payment_method)}
                   {o.payment_method_2 && <span className="text-xs"> + {paymentMethodLabel(o.payment_method_2)}</span>}
                   <br /><span className="text-xs text-muted-foreground">{paymentStatusLabel(o.payment_status)}</span>
-                  {o.payment_proof_url && <a href={o.payment_proof_url} target="_blank" rel="noreferrer" className="inline-flex items-center text-[10px] text-primary ml-1"><FileText className="h-3 w-3" /></a>}
+                  {o.payment_proof_url && <button type="button" onClick={() => openProof(o.payment_proof_url)} className="inline-flex items-center text-[10px] text-primary ml-1"><FileText className="h-3 w-3" /></button>}
                 </TableCell>
                 <TableCell><Badge variant="secondary">{orderStatusLabel(o.status)}</Badge></TableCell>
                 <TableCell className="text-sm">{dateTimeBR(o.created_at)}</TableCell>
