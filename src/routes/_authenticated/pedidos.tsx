@@ -554,7 +554,16 @@ function OrderDetailsDialog({ orderId, order, onClose }: { orderId: string | nul
             {order.payment_amount_2 != null && <div><span className="text-muted-foreground">Valor 2ª:</span> {brl(order.payment_amount_2)}</div>}
           </div>
           {order.payment_proof_url && (
-            <a href={order.payment_proof_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-primary underline"><FileText className="h-4 w-4" /> Ver comprovante</a>
+            <button
+              type="button"
+              onClick={async () => {
+                const ref = order.payment_proof_url as string;
+                if (/^https?:\/\//i.test(ref)) { window.open(ref, "_blank", "noopener,noreferrer"); return; }
+                const { data } = await supabase.storage.from("payment-proofs").createSignedUrl(ref, 60);
+                if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+              }}
+              className="inline-flex items-center gap-1 text-sm text-primary underline"
+            ><FileText className="h-4 w-4" /> Ver comprovante</button>
           )}
           <Table>
             <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead className="text-center">Qtd</TableHead><TableHead className="text-right">Preço</TableHead><TableHead className="text-right">Subtotal</TableHead></TableRow></TableHeader>
