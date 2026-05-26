@@ -125,6 +125,14 @@ function Page() {
 
   const reset = () => { setForm(emptyForm); setEditingId(null); setProductQuery(""); setSelProduct(""); setSelVariant(""); setSelQty("1"); };
 
+  const openProof = async (ref: string) => {
+    if (!ref) return;
+    if (/^https?:\/\//i.test(ref)) { window.open(ref, "_blank", "noopener,noreferrer"); return; }
+    const { data, error } = await supabase.storage.from("payment-proofs").createSignedUrl(ref, 60);
+    if (error || !data?.signedUrl) { toast.error("Não foi possível abrir o comprovante"); return; }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+
   const uploadProof = async (file: File) => {
     setUploading(true);
     try {
@@ -132,8 +140,8 @@ function Page() {
       const path = `${user?.id || "anon"}/${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from("payment-proofs").upload(path, file, { upsert: false });
       if (error) throw error;
-      const { data } = supabase.storage.from("payment-proofs").getPublicUrl(path);
-      setForm((f) => ({ ...f, paymentProofUrl: data.publicUrl }));
+      // Store the storage path; we generate short-lived signed URLs on demand.
+      setForm((f) => ({ ...f, paymentProofUrl: path }));
       toast.success("Comprovante anexado");
     } catch (e: any) { toast.error(e.message); }
     finally { setUploading(false); }
@@ -410,7 +418,7 @@ function Page() {
                       <Button type="button" variant="outline" size="sm" disabled={uploading} onClick={() => proofRef.current?.click()}>
                         <Upload className="h-3.5 w-3.5 mr-1" /> {uploading ? "Enviando…" : form.paymentProofUrl ? "Substituir" : "Anexar"}
                       </Button>
-                      {form.paymentProofUrl && <a href={form.paymentProofUrl} target="_blank" rel="noreferrer" className="text-xs text-primary underline self-center">Ver arquivo</a>}
+                      {form.paymentProofUrl && <button type="button" onClick={() => openProof(form.paymentProofUrl)} className="text-xs text-primary underline self-center">Ver arquivo</button>}
                     </div>
                   </div>
 
@@ -498,7 +506,7 @@ function Page() {
                   {paymentMethodLabel(o.payment_method)}
                   {o.payment_method_2 && <span className="text-xs"> + {paymentMethodLabel(o.payment_method_2)}</span>}
                   <br /><span className="text-xs text-muted-foreground">{paymentStatusLabel(o.payment_status)}</span>
-                  {o.payment_proof_url && <a href={o.payment_proof_url} target="_blank" rel="noreferrer" className="inline-flex items-center text-[10px] text-primary ml-1"><FileText className="h-3 w-3" /></a>}
+                  {o.payment_proof_url && <button type="button" onClick={() => openProof(o.payment_proof_url)} className="inline-flex items-center text-[10px] text-primary ml-1"><FileText className="h-3 w-3" /></button>}
                 </TableCell>
                 <TableCell><Badge variant="secondary">{orderStatusLabel(o.status)}</Badge></TableCell>
                 <TableCell className="text-sm">{dateTimeBR(o.created_at)}</TableCell>
@@ -546,7 +554,16 @@ function OrderDetailsDialog({ orderId, order, onClose }: { orderId: string | nul
             {order.payment_amount_2 != null && <div><span className="text-muted-foreground">Valor 2ª:</span> {brl(order.payment_amount_2)}</div>}
           </div>
           {order.payment_proof_url && (
-            <a href={order.payment_proof_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-primary underline"><FileText className="h-4 w-4" /> Ver comprovante</a>
+            <button
+              type="button"
+              onClick={async () => {
+                const ref = order.payment_proof_url as string;
+                if (/^https?:\/\//i.test(ref)) { window.open(ref, "_blank", "noopener,noreferrer"); return; }
+                const { data } = await supabase.storage.from("payment-proofs").createSignedUrl(ref, 60);
+                if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+              }}
+              className="inline-flex items-center gap-1 text-sm text-primary underline"
+            ><FileText className="h-4 w-4" /> Ver comprovante</button>
           )}
           <Table>
             <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead className="text-center">Qtd</TableHead><TableHead className="text-right">Preço</TableHead><TableHead className="text-right">Subtotal</TableHead></TableRow></TableHeader>
