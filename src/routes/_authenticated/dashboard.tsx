@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { brl, dateTimeBR, channelLabel, orderStatusLabel, paymentMethodLabel } from "@/lib/format";
-import { DollarSign, ShoppingBag, Package, AlertTriangle, TrendingUp, Download, Wallet, Banknote } from "lucide-react";
+import { DollarSign, ShoppingBag, AlertTriangle, TrendingUp, Download, Wallet, Banknote, Percent, FileBarChart2 } from "lucide-react";
 import { downloadXLSX } from "@/lib/export";
 import { walletFor, WALLETS, channelFeeAmount, type Wallet as WalletType } from "@/lib/wallet";
 
@@ -36,7 +36,7 @@ function Dashboard() {
     queryKey: ["dashboard", month],
     queryFn: async () => {
       const [ordersMonth, recent, lowStock, products, itemsMonth] = await Promise.all([
-        supabase.from("orders").select("id,total,shipping,channel,payment_method,payment_method_2,payment_amount_1,payment_amount_2,status,created_at").gte("created_at", start).lt("created_at", end),
+        supabase.from("orders").select("id,subtotal,discount,total,shipping,channel,payment_method,payment_method_2,payment_amount_1,payment_amount_2,status,created_at").gte("created_at", start).lt("created_at", end),
         supabase.from("orders").select("id,order_code,total,status,channel,created_at,customers(name)").gte("created_at", start).lt("created_at", end).order("created_at", { ascending: false }).limit(10),
         supabase.from("products").select("id,name,stock,min_stock").eq("status", "ativo"),
         supabase.from("products").select("id", { count: "exact", head: true }),
@@ -44,6 +44,8 @@ function Dashboard() {
       ]);
 
       const monthTotal = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.total ?? 0), 0);
+      const grossRevenue = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.subtotal ?? 0), 0);
+      const totalDiscount = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.discount ?? 0), 0);
       const low = (lowStock.data ?? []).filter((p: any) => p.stock <= p.min_stock);
       const byChannel: Record<string, { count: number; total: number }> = {};
       const byPayment: Record<string, { count: number; total: number }> = {};
@@ -68,12 +70,18 @@ function Dashboard() {
         totalShipping += Number((o as any).shipping ?? 0);
       }
       const totalCogs = (itemsMonth.data ?? []).reduce((s: number, i: any) => s + Number(i.unit_cost ?? 0) * Number(i.quantity ?? 0), 0);
-      const realProfit = monthTotal - totalCogs - totalFees;
+      const grossProfit = monthTotal - totalCogs;
+      const realProfit = grossProfit - totalFees;
+      const cogsPct = monthTotal > 0 ? (totalCogs / monthTotal) * 100 : 0;
+      const feesPct = monthTotal > 0 ? (totalFees / monthTotal) * 100 : 0;
+      const grossMarginPct = monthTotal > 0 ? (grossProfit / monthTotal) * 100 : 0;
+      const realMarginPct = monthTotal > 0 ? (realProfit / monthTotal) * 100 : 0;
       const avgTicket = (ordersMonth.data?.length ?? 0) > 0 ? monthTotal / (ordersMonth.data!.length) : 0;
       return {
         monthTotal, ordersMonth: ordersMonth.data?.length ?? 0, avgTicket,
         productsCount: products.count ?? 0, lowStock: low, recent: recent.data ?? [],
         byChannel, byPayment, byWallet, totalFees, totalCogs, totalShipping, realProfit,
+        grossRevenue, totalDiscount, grossProfit, cogsPct, feesPct, grossMarginPct, realMarginPct,
       };
     },
   });
@@ -81,10 +89,17 @@ function Dashboard() {
   const exportDashboard = () => {
     const resumo = [
       { Métrica: "Mês", Valor: label },
-      { Métrica: "Faturamento", Valor: data?.monthTotal ?? 0 },
-      { Métrica: "Custo dos produtos (CMV)", Valor: data?.totalCogs ?? 0 },
-      { Métrica: "Comissões plataformas", Valor: data?.totalFees ?? 0 },
-      { Métrica: "Lucro real", Valor: data?.realProfit ?? 0 },
+      { Métrica: "Receita bruta (produtos)", Valor: data?.grossRevenue ?? 0 },
+      { Métrica: "(−) Descontos concedidos", Valor: data?.totalDiscount ?? 0 },
+      { Métrica: "(+) Frete cobrado", Valor: data?.totalShipping ?? 0 },
+      { Métrica: "(=) Receita líquida", Valor: data?.monthTotal ?? 0 },
+      { Métrica: "(−) CMV", Valor: data?.totalCogs ?? 0 },
+      { Métrica: "CMV %", Valor: `${(data?.cogsPct ?? 0).toFixed(1)}%` },
+      { Métrica: "(=) Lucro bruto", Valor: data?.grossProfit ?? 0 },
+      { Métrica: "Margem bruta %", Valor: `${(data?.grossMarginPct ?? 0).toFixed(1)}%` },
+      { Métrica: "(−) Comissões plataformas", Valor: data?.totalFees ?? 0 },
+      { Métrica: "(=) Lucro real", Valor: data?.realProfit ?? 0 },
+      { Métrica: "Margem líquida %", Valor: `${(data?.realMarginPct ?? 0).toFixed(1)}%` },
       { Métrica: "Pedidos", Valor: data?.ordersMonth ?? 0 },
       { Métrica: "Ticket médio", Valor: data?.avgTicket ?? 0 },
       { Métrica: "Produtos ativos", Valor: data?.productsCount ?? 0 },
@@ -110,12 +125,46 @@ function Dashboard() {
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard accent label="Faturamento do mês" value={brl(data?.monthTotal ?? 0)} icon={DollarSign} hint={`${data?.ordersMonth ?? 0} pedidos`} />
-        <StatCard label="Lucro real" value={brl(data?.realProfit ?? 0)} icon={TrendingUp} hint={`− CMV ${brl(data?.totalCogs ?? 0)} − taxas ${brl(data?.totalFees ?? 0)}`} />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
+        <StatCard accent label="Faturamento" value={brl(data?.monthTotal ?? 0)} icon={DollarSign} hint={`${data?.ordersMonth ?? 0} pedidos`} />
+        <StatCard label="CMV %" value={`${(data?.cogsPct ?? 0).toFixed(1)}%`} icon={Percent} hint={brl(data?.totalCogs ?? 0)} />
+        <StatCard label="Lucro real" value={brl(data?.realProfit ?? 0)} icon={TrendingUp} hint={`− CMV − taxas ${brl(data?.totalFees ?? 0)}`} />
+        <StatCard label="Margem líquida" value={`${(data?.realMarginPct ?? 0).toFixed(1)}%`} icon={Percent} hint={`Bruta ${(data?.grossMarginPct ?? 0).toFixed(1)}%`} />
         <StatCard label="Ticket médio" value={brl(data?.avgTicket ?? 0)} icon={Banknote} />
-        <StatCard label="Estoque baixo" value={data?.lowStock?.length ?? 0} icon={AlertTriangle} hint="Produtos abaixo do mínimo" />
+        <StatCard label="Estoque baixo" value={data?.lowStock?.length ?? 0} icon={AlertTriangle} hint="Abaixo do mínimo" />
       </div>
+
+      <Card className="p-5 shadow-card mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <FileBarChart2 className="h-4 w-4 text-primary" />
+          <h3 className="font-semibold">DRE do mês</h3>
+          <span className="text-xs text-muted-foreground ml-2">Demonstração do resultado</span>
+        </div>
+        <div className="divide-y divide-border text-sm">
+          {[
+            { label: "Receita bruta (produtos)", value: data?.grossRevenue ?? 0, sign: "+" },
+            { label: "Descontos concedidos", value: -(data?.totalDiscount ?? 0), sign: "−" },
+            { label: "Frete cobrado", value: data?.totalShipping ?? 0, sign: "+" },
+            { label: "Receita líquida", value: data?.monthTotal ?? 0, total: true },
+            { label: `CMV (${(data?.cogsPct ?? 0).toFixed(1)}%)`, value: -(data?.totalCogs ?? 0), sign: "−" },
+            { label: `Lucro bruto (${(data?.grossMarginPct ?? 0).toFixed(1)}%)`, value: data?.grossProfit ?? 0, total: true },
+            { label: "Comissões plataformas", value: -(data?.totalFees ?? 0), sign: "−" },
+            { label: `Lucro real (${(data?.realMarginPct ?? 0).toFixed(1)}%)`, value: data?.realProfit ?? 0, total: true, highlight: true },
+          ].map((row, i) => (
+            <div key={i} className={`flex items-center justify-between py-2 ${row.total ? "font-semibold" : ""} ${row.highlight ? "text-primary" : ""}`}>
+              <span className="flex items-center gap-2">
+                {row.sign && <span className="text-muted-foreground w-3 inline-block text-center">{row.sign}</span>}
+                {!row.sign && <span className="w-3" />}
+                {row.label}
+              </span>
+              <span className={row.total ? "tabular-nums" : "tabular-nums text-muted-foreground"}>{brl(Math.abs(row.value))}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-3">
+          CMV usa o custo do produto no momento da venda. Comissões: Site 4% · Shopee 22% · TikTok 12%. Não inclui frete pago à transportadora, impostos, devoluções e despesas fixas.
+        </p>
+      </Card>
 
       <Card className="p-5 shadow-card mb-6">
         <div className="flex items-center gap-2 mb-4">
