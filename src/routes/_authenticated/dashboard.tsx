@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { brl, dateTimeBR, channelLabel, orderStatusLabel, paymentMethodLabel } from "@/lib/format";
-import { DollarSign, ShoppingBag, Package, AlertTriangle, TrendingUp, Download, Wallet, Banknote } from "lucide-react";
+import { DollarSign, ShoppingBag, AlertTriangle, TrendingUp, Download, Wallet, Banknote, Percent, FileBarChart2 } from "lucide-react";
 import { downloadXLSX } from "@/lib/export";
 import { walletFor, WALLETS, channelFeeAmount, type Wallet as WalletType } from "@/lib/wallet";
 
@@ -36,7 +36,7 @@ function Dashboard() {
     queryKey: ["dashboard", month],
     queryFn: async () => {
       const [ordersMonth, recent, lowStock, products, itemsMonth] = await Promise.all([
-        supabase.from("orders").select("id,total,shipping,channel,payment_method,payment_method_2,payment_amount_1,payment_amount_2,status,created_at").gte("created_at", start).lt("created_at", end),
+        supabase.from("orders").select("id,subtotal,discount,total,shipping,channel,payment_method,payment_method_2,payment_amount_1,payment_amount_2,status,created_at").gte("created_at", start).lt("created_at", end),
         supabase.from("orders").select("id,order_code,total,status,channel,created_at,customers(name)").gte("created_at", start).lt("created_at", end).order("created_at", { ascending: false }).limit(10),
         supabase.from("products").select("id,name,stock,min_stock").eq("status", "ativo"),
         supabase.from("products").select("id", { count: "exact", head: true }),
@@ -44,6 +44,8 @@ function Dashboard() {
       ]);
 
       const monthTotal = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.total ?? 0), 0);
+      const grossRevenue = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.subtotal ?? 0), 0);
+      const totalDiscount = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.discount ?? 0), 0);
       const low = (lowStock.data ?? []).filter((p: any) => p.stock <= p.min_stock);
       const byChannel: Record<string, { count: number; total: number }> = {};
       const byPayment: Record<string, { count: number; total: number }> = {};
@@ -68,12 +70,18 @@ function Dashboard() {
         totalShipping += Number((o as any).shipping ?? 0);
       }
       const totalCogs = (itemsMonth.data ?? []).reduce((s: number, i: any) => s + Number(i.unit_cost ?? 0) * Number(i.quantity ?? 0), 0);
-      const realProfit = monthTotal - totalCogs - totalFees;
+      const grossProfit = monthTotal - totalCogs;
+      const realProfit = grossProfit - totalFees;
+      const cogsPct = monthTotal > 0 ? (totalCogs / monthTotal) * 100 : 0;
+      const feesPct = monthTotal > 0 ? (totalFees / monthTotal) * 100 : 0;
+      const grossMarginPct = monthTotal > 0 ? (grossProfit / monthTotal) * 100 : 0;
+      const realMarginPct = monthTotal > 0 ? (realProfit / monthTotal) * 100 : 0;
       const avgTicket = (ordersMonth.data?.length ?? 0) > 0 ? monthTotal / (ordersMonth.data!.length) : 0;
       return {
         monthTotal, ordersMonth: ordersMonth.data?.length ?? 0, avgTicket,
         productsCount: products.count ?? 0, lowStock: low, recent: recent.data ?? [],
         byChannel, byPayment, byWallet, totalFees, totalCogs, totalShipping, realProfit,
+        grossRevenue, totalDiscount, grossProfit, cogsPct, feesPct, grossMarginPct, realMarginPct,
       };
     },
   });
@@ -81,10 +89,17 @@ function Dashboard() {
   const exportDashboard = () => {
     const resumo = [
       { Métrica: "Mês", Valor: label },
-      { Métrica: "Faturamento", Valor: data?.monthTotal ?? 0 },
-      { Métrica: "Custo dos produtos (CMV)", Valor: data?.totalCogs ?? 0 },
-      { Métrica: "Comissões plataformas", Valor: data?.totalFees ?? 0 },
-      { Métrica: "Lucro real", Valor: data?.realProfit ?? 0 },
+      { Métrica: "Receita bruta (produtos)", Valor: data?.grossRevenue ?? 0 },
+      { Métrica: "(−) Descontos concedidos", Valor: data?.totalDiscount ?? 0 },
+      { Métrica: "(+) Frete cobrado", Valor: data?.totalShipping ?? 0 },
+      { Métrica: "(=) Receita líquida", Valor: data?.monthTotal ?? 0 },
+      { Métrica: "(−) CMV", Valor: data?.totalCogs ?? 0 },
+      { Métrica: "CMV %", Valor: `${(data?.cogsPct ?? 0).toFixed(1)}%` },
+      { Métrica: "(=) Lucro bruto", Valor: data?.grossProfit ?? 0 },
+      { Métrica: "Margem bruta %", Valor: `${(data?.grossMarginPct ?? 0).toFixed(1)}%` },
+      { Métrica: "(−) Comissões plataformas", Valor: data?.totalFees ?? 0 },
+      { Métrica: "(=) Lucro real", Valor: data?.realProfit ?? 0 },
+      { Métrica: "Margem líquida %", Valor: `${(data?.realMarginPct ?? 0).toFixed(1)}%` },
       { Métrica: "Pedidos", Valor: data?.ordersMonth ?? 0 },
       { Métrica: "Ticket médio", Valor: data?.avgTicket ?? 0 },
       { Métrica: "Produtos ativos", Valor: data?.productsCount ?? 0 },
