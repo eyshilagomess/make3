@@ -125,12 +125,46 @@ function Dashboard() {
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard accent label="Faturamento do mês" value={brl(data?.monthTotal ?? 0)} icon={DollarSign} hint={`${data?.ordersMonth ?? 0} pedidos`} />
-        <StatCard label="Lucro real" value={brl(data?.realProfit ?? 0)} icon={TrendingUp} hint={`− CMV ${brl(data?.totalCogs ?? 0)} − taxas ${brl(data?.totalFees ?? 0)}`} />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
+        <StatCard accent label="Faturamento" value={brl(data?.monthTotal ?? 0)} icon={DollarSign} hint={`${data?.ordersMonth ?? 0} pedidos`} />
+        <StatCard label="CMV %" value={`${(data?.cogsPct ?? 0).toFixed(1)}%`} icon={Percent} hint={brl(data?.totalCogs ?? 0)} />
+        <StatCard label="Lucro real" value={brl(data?.realProfit ?? 0)} icon={TrendingUp} hint={`− CMV − taxas ${brl(data?.totalFees ?? 0)}`} />
+        <StatCard label="Margem líquida" value={`${(data?.realMarginPct ?? 0).toFixed(1)}%`} icon={Percent} hint={`Bruta ${(data?.grossMarginPct ?? 0).toFixed(1)}%`} />
         <StatCard label="Ticket médio" value={brl(data?.avgTicket ?? 0)} icon={Banknote} />
-        <StatCard label="Estoque baixo" value={data?.lowStock?.length ?? 0} icon={AlertTriangle} hint="Produtos abaixo do mínimo" />
+        <StatCard label="Estoque baixo" value={data?.lowStock?.length ?? 0} icon={AlertTriangle} hint="Abaixo do mínimo" />
       </div>
+
+      <Card className="p-5 shadow-card mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <FileBarChart2 className="h-4 w-4 text-primary" />
+          <h3 className="font-semibold">DRE do mês</h3>
+          <span className="text-xs text-muted-foreground ml-2">Demonstração do resultado</span>
+        </div>
+        <div className="divide-y divide-border text-sm">
+          {[
+            { label: "Receita bruta (produtos)", value: data?.grossRevenue ?? 0, sign: "+" },
+            { label: "Descontos concedidos", value: -(data?.totalDiscount ?? 0), sign: "−" },
+            { label: "Frete cobrado", value: data?.totalShipping ?? 0, sign: "+" },
+            { label: "Receita líquida", value: data?.monthTotal ?? 0, total: true },
+            { label: `CMV (${(data?.cogsPct ?? 0).toFixed(1)}%)`, value: -(data?.totalCogs ?? 0), sign: "−" },
+            { label: `Lucro bruto (${(data?.grossMarginPct ?? 0).toFixed(1)}%)`, value: data?.grossProfit ?? 0, total: true },
+            { label: "Comissões plataformas", value: -(data?.totalFees ?? 0), sign: "−" },
+            { label: `Lucro real (${(data?.realMarginPct ?? 0).toFixed(1)}%)`, value: data?.realProfit ?? 0, total: true, highlight: true },
+          ].map((row, i) => (
+            <div key={i} className={`flex items-center justify-between py-2 ${row.total ? "font-semibold" : ""} ${row.highlight ? "text-primary" : ""}`}>
+              <span className="flex items-center gap-2">
+                {row.sign && <span className="text-muted-foreground w-3 inline-block text-center">{row.sign}</span>}
+                {!row.sign && <span className="w-3" />}
+                {row.label}
+              </span>
+              <span className={row.total ? "tabular-nums" : "tabular-nums text-muted-foreground"}>{brl(Math.abs(row.value))}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-3">
+          CMV usa o custo do produto no momento da venda. Comissões: Site 4% · Shopee 22% · TikTok 12%. Não inclui frete pago à transportadora, impostos, devoluções e despesas fixas.
+        </p>
+      </Card>
 
       <Card className="p-5 shadow-card mb-6">
         <div className="flex items-center gap-2 mb-4">
