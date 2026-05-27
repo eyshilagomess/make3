@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      allocation_config: {
+        Row: {
+          created_at: string
+          expenses_pct: number
+          id: string
+          investment_pct: number
+          prolabore_pct: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          expenses_pct?: number
+          id?: string
+          investment_pct?: number
+          prolabore_pct?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          expenses_pct?: number
+          id?: string
+          investment_pct?: number
+          prolabore_pct?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
@@ -55,6 +85,39 @@ export type Database = {
           notes?: string | null
           origin_channel?: Database["public"]["Enums"]["sales_channel"] | null
           phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string | null
+          expense_date: string
+          id: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          category: string
+          created_at?: string
+          created_by?: string | null
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          expense_date?: string
+          id?: string
+          notes?: string | null
           updated_at?: string
         }
         Relationships: []
