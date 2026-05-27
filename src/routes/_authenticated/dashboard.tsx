@@ -35,12 +35,15 @@ function Dashboard() {
   const { data } = useQuery({
     queryKey: ["dashboard", month],
     queryFn: async () => {
-      const [ordersMonth, recent, lowStock, products, itemsMonth] = await Promise.all([
+      const startDate = new Date(start).toISOString().slice(0, 10);
+      const endDate = new Date(end).toISOString().slice(0, 10);
+      const [ordersMonth, recent, lowStock, products, itemsMonth, expensesMonth] = await Promise.all([
         supabase.from("orders").select("id,subtotal,discount,total,shipping,channel,payment_method,payment_method_2,payment_amount_1,payment_amount_2,status,created_at").gte("created_at", start).lt("created_at", end),
         supabase.from("orders").select("id,order_code,total,status,channel,created_at,customers(name)").gte("created_at", start).lt("created_at", end).order("created_at", { ascending: false }).limit(10),
         supabase.from("products").select("id,name,stock,min_stock").eq("status", "ativo"),
         supabase.from("products").select("id", { count: "exact", head: true }),
         supabase.from("order_items").select("order_id,quantity,unit_cost,orders!inner(created_at)").gte("orders.created_at", start).lt("orders.created_at", end),
+        (supabase as any).from("expenses").select("amount,category").gte("expense_date", startDate).lt("expense_date", endDate),
       ]);
 
       const monthTotal = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.total ?? 0), 0);
@@ -70,8 +73,10 @@ function Dashboard() {
         totalShipping += Number((o as any).shipping ?? 0);
       }
       const totalCogs = (itemsMonth.data ?? []).reduce((s: number, i: any) => s + Number(i.unit_cost ?? 0) * Number(i.quantity ?? 0), 0);
+      const totalExpenses = (expensesMonth.data ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0);
       const grossProfit = monthTotal - totalCogs;
-      const realProfit = grossProfit - totalFees;
+      const profitAfterFees = grossProfit - totalFees;
+      const realProfit = profitAfterFees - totalExpenses;
       const cogsPct = monthTotal > 0 ? (totalCogs / monthTotal) * 100 : 0;
       const feesPct = monthTotal > 0 ? (totalFees / monthTotal) * 100 : 0;
       const grossMarginPct = monthTotal > 0 ? (grossProfit / monthTotal) * 100 : 0;
@@ -80,7 +85,7 @@ function Dashboard() {
       return {
         monthTotal, ordersMonth: ordersMonth.data?.length ?? 0, avgTicket,
         productsCount: products.count ?? 0, lowStock: low, recent: recent.data ?? [],
-        byChannel, byPayment, byWallet, totalFees, totalCogs, totalShipping, realProfit,
+        byChannel, byPayment, byWallet, totalFees, totalCogs, totalShipping, realProfit, totalExpenses, profitAfterFees,
         grossRevenue, totalDiscount, grossProfit, cogsPct, feesPct, grossMarginPct, realMarginPct,
       };
     },
@@ -98,6 +103,8 @@ function Dashboard() {
       { Métrica: "(=) Lucro bruto", Valor: data?.grossProfit ?? 0 },
       { Métrica: "Margem bruta %", Valor: `${(data?.grossMarginPct ?? 0).toFixed(1)}%` },
       { Métrica: "(−) Comissões plataformas", Valor: data?.totalFees ?? 0 },
+      { Métrica: "(=) Lucro operacional", Valor: data?.profitAfterFees ?? 0 },
+      { Métrica: "(−) Gastos do mês", Valor: data?.totalExpenses ?? 0 },
       { Métrica: "(=) Lucro real", Valor: data?.realProfit ?? 0 },
       { Métrica: "Margem líquida %", Valor: `${(data?.realMarginPct ?? 0).toFixed(1)}%` },
       { Métrica: "Pedidos", Valor: data?.ordersMonth ?? 0 },
@@ -149,6 +156,8 @@ function Dashboard() {
             { label: `CMV (${(data?.cogsPct ?? 0).toFixed(1)}%)`, value: -(data?.totalCogs ?? 0), sign: "−" },
             { label: `Lucro bruto (${(data?.grossMarginPct ?? 0).toFixed(1)}%)`, value: data?.grossProfit ?? 0, total: true },
             { label: "Comissões plataformas", value: -(data?.totalFees ?? 0), sign: "−" },
+            { label: "Lucro operacional", value: data?.profitAfterFees ?? 0, total: true },
+            { label: "Gastos do mês (marketing, sacola, chip…)", value: -(data?.totalExpenses ?? 0), sign: "−" },
             { label: `Lucro real (${(data?.realMarginPct ?? 0).toFixed(1)}%)`, value: data?.realProfit ?? 0, total: true, highlight: true },
           ].map((row, i) => (
             <div key={i} className={`flex items-center justify-between py-2 ${row.total ? "font-semibold" : ""} ${row.highlight ? "text-primary" : ""}`}>
