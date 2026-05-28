@@ -611,3 +611,125 @@ function VariantsDialog({ open, product, onClose }: { open: boolean; product: { 
     </Dialog>
   );
 }
+type InvoiceItem = { name: string; sku: string | null; quantity: number; unit_cost: number; category: string | null; brand: string | null };
+
+function InvoiceDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const extract = useServerFn(extractFromImage);
+  const [busy, setBusy] = useState(false);
+  const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [margin, setMargin] = useState("30");
+
+  const onFile = async (file: File) => {
+    setBusy(true);
+    try {
+      const buf = await file.arrayBuffer();
+      let bin = ""; const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+      const b64 = btoa(bin);
+      const r: any = await extract({ data: { imageBase64: b64, mimeType: file.type || "image/jpeg", kind: "invoice" } });
+      const list = Array.isArray(r?.items) ? r.items : [];
+      if (list.length === 0) throw new Error("Nenhum item identificado");
+      setItems(list.map((it: any) => ({
+        name: String(it.name ?? "").trim(),
+        sku: it.sku || null,
+        quantity: Number(it.quantity ?? 1),
+        unit_cost: Number(it.unit_cost ?? 0),
+        category: it.category || null,
+        brand: it.brand || null,
+      })));
+      toast.success(`${list.length} item(ns) detectado(s)`);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const updateItem = (i: number, patch: Partial<InvoiceItem>) => {
+    setItems((arr) => arr.map((x, idx) => idx === i ? { ...x, ...patch } : x));
+  };
+  const removeItem = (i: number) => setItems((arr) => arr.filter((_, idx) => idx !== i));
+
+  const importAll = async () => {
+    if (items.length === 0) return toast.error("Nenhum item para importar");
+    setBusy(true);
+    try {
+      const m = Number(margin || 0);
+      const payload = items.filter(it => it.name).map((it) => {
+        const prices = calcAllPrices(it.unit_cost, 0, 0, m);
+        return {
+          name: it.name, sku: it.sku, category: it.category, brand: it.brand,
+          cost: it.unit_cost, packaging_cost: 0, other_costs: 0, target_margin: m,
+          price: prices.site ?? it.unit_cost,
+          price_site: prices.site, price_shopee: prices.shopee, price_tiktok: prices.tiktok,
+          stock: Math.max(0, Math.floor(it.quantity)), min_stock: 0, has_variants: false,
+        };
+      });
+      const { data: inserted, error } = await supabase.from("products").insert(payload).select("id,stock,name");
+      if (error) throw error;
+      const movs = (inserted ?? []).filter((p: any) => p.stock > 0).map((p: any) => ({
+        product_id: p.id, movement_type: "entrada" as const, quantity: p.stock, reason: "Importado da nota fiscal",
+      }));
+      if (movs.length > 0) {
+        await supabase.from("stock_movements").insert(movs);
+      }
+      toast.success(`${payload.length} produto(s) cadastrado(s) da nota`);
+      setItems([]); onDone(); onClose();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && (onClose(), setItems([]))}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader><DialogTitle>Importar produtos da nota fiscal</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground flex items-center gap-1">
+            <Sparkles className="h-4 w-4 text-primary" /> Suba uma foto/imagem da nota — a IA extrai os itens. Você revisa e edita antes de salvar.
+          </p>
+          <div className="flex items-center gap-2">
+            <Input type="file" accept="image/*" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
+            <div className="flex items-center gap-1">
+              <Label className="text-xs whitespace-nowrap">Margem %</Label>
+              <Input type="number" step="0.1" className="w-20 h-9" value={margin} onChange={(e) => setMargin(e.target.value)} />
+            </div>
+          </div>
+          {busy && items.length === 0 && <p className="text-sm text-muted-foreground">Lendo a nota…</p>}
+          {items.length > 0 && (
+            <div className="rounded-md border border-border max-h-96 overflow-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted sticky top-0">
+                  <tr>
+                    <th className="p-2 text-left">Nome</th>
+                    <th className="p-2 text-left">SKU</th>
+                    <th className="p-2 text-left">Categoria</th>
+                    <th className="p-2 text-left">Marca</th>
+                    <th className="p-2 text-left">Qtd</th>
+                    <th className="p-2 text-left">Custo unit.</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((it, i) => (
+                    <tr key={i} className="border-t border-border">
+                      <td className="p-1"><Input className="h-8" value={it.name} onChange={(e) => updateItem(i, { name: e.target.value })} /></td>
+                      <td className="p-1"><Input className="h-8 w-24 font-mono text-xs" value={it.sku ?? ""} onChange={(e) => updateItem(i, { sku: e.target.value })} /></td>
+                      <td className="p-1"><Input className="h-8 w-28" value={it.category ?? ""} onChange={(e) => updateItem(i, { category: e.target.value })} /></td>
+                      <td className="p-1"><Input className="h-8 w-24" value={it.brand ?? ""} onChange={(e) => updateItem(i, { brand: e.target.value })} /></td>
+                      <td className="p-1"><Input className="h-8 w-16" type="number" value={it.quantity} onChange={(e) => updateItem(i, { quantity: Number(e.target.value) })} /></td>
+                      <td className="p-1"><Input className="h-8 w-24" type="number" step="0.01" value={it.unit_cost} onChange={(e) => updateItem(i, { unit_cost: Number(e.target.value) })} /></td>
+                      <td className="p-1 text-right"><Button size="sm" variant="ghost" onClick={() => removeItem(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => { setItems([]); onClose(); }}>Cancelar</Button>
+            <Button onClick={importAll} disabled={busy || items.length === 0} className="bg-gradient-brand text-primary-foreground border-0">
+              {busy ? "Salvando…" : `Cadastrar ${items.length || ""} produto(s)`}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
