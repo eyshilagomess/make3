@@ -4,6 +4,17 @@ export const CHANNEL_FEES = {
   tiktok: 0.12,
 } as const;
 
+/**
+ * Taxas da maquininha Infinity Pay (presencial).
+ * Pix = 0%, Débito = 1,49%, Crédito à vista = 4,29%.
+ * Ajuste aqui se sua tabela for diferente.
+ */
+export const INFINITY_FEES = {
+  pix: 0,
+  cartao_debito: 0.0149,
+  cartao_credito: 0.0429,
+} as const;
+
 export type Channel = keyof typeof CHANNEL_FEES;
 
 export const CHANNEL_LABEL: Record<Channel, string> = {
