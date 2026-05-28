@@ -11,12 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Layers, Trash2, Upload, Download, Pencil, Check, X } from "lucide-react";
+import { Plus, Search, Layers, Trash2, Upload, Download, Pencil, Check, X, FileText, Sparkles } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { brl } from "@/lib/format";
 import { calcAllPrices, calcPrice, marginFromPrice, CHANNEL_FEES, CHANNEL_LABEL, totalCost, type Channel } from "@/lib/pricing";
 import * as XLSX from "xlsx";
+import { useServerFn } from "@tanstack/react-start";
+import { extractFromImage } from "@/lib/extract-invoice.functions";
 
 export const Route = createFileRoute("/_authenticated/produtos")({
   head: () => ({ meta: [{ title: "Produtos — Make 3" }] }),
@@ -44,6 +46,7 @@ function Page() {
   const [search, setSearch] = useState("");
   const [variantsFor, setVariantsFor] = useState<{ id: string; name: string } | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const { data } = useQuery({
@@ -159,6 +162,7 @@ function Page() {
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={downloadTemplate}><Download className="h-4 w-4 mr-1" /> Modelo</Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-1" /> Importar</Button>
+          <Button variant="outline" onClick={() => setInvoiceOpen(true)}><FileText className="h-4 w-4 mr-1" /> Nota fiscal</Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button className="bg-gradient-brand text-primary-foreground border-0 shadow-glow"><Plus className="h-4 w-4 mr-1" /> Novo produto</Button></DialogTrigger>
             <DialogContent className="max-w-2xl">
@@ -234,6 +238,7 @@ function Page() {
 
       <VariantsDialog open={!!variantsFor} product={variantsFor} onClose={() => setVariantsFor(null)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
+      <InvoiceDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <Dialog open={!!editingId} onOpenChange={(v) => !v && (setEditingId(null), setForm(empty))}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Editar produto {editingProduct?.name ? `— ${editingProduct.name}` : ""}</DialogTitle></DialogHeader>
