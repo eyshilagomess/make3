@@ -98,6 +98,7 @@ export type Database = {
           expense_date: string
           id: string
           notes: string | null
+          photo_url: string | null
           updated_at: string
         }
         Insert: {
@@ -108,6 +109,7 @@ export type Database = {
           expense_date?: string
           id?: string
           notes?: string | null
+          photo_url?: string | null
           updated_at?: string
         }
         Update: {
@@ -118,6 +120,7 @@ export type Database = {
           expense_date?: string
           id?: string
           notes?: string | null
+          photo_url?: string | null
           updated_at?: string
         }
         Relationships: []

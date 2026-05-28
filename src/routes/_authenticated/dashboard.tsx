@@ -9,9 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { brl, dateTimeBR, channelLabel, orderStatusLabel, paymentMethodLabel } from "@/lib/format";
-import { DollarSign, ShoppingBag, AlertTriangle, TrendingUp, Download, Wallet, Banknote, Percent, FileBarChart2 } from "lucide-react";
+import { DollarSign, ShoppingBag, AlertTriangle, TrendingUp, Download, Wallet, Banknote, Percent, FileBarChart2, Receipt } from "lucide-react";
 import { downloadXLSX } from "@/lib/export";
-import { walletFor, WALLETS, channelFeeAmount, type Wallet as WalletType } from "@/lib/wallet";
+import { walletFor, WALLETS, channelFeeAmount, infinityPayFeeAmount, type Wallet as WalletType } from "@/lib/wallet";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Make 3" }] }),
@@ -54,6 +54,8 @@ function Dashboard() {
       const byPayment: Record<string, { count: number; total: number }> = {};
       const byWallet: Record<WalletType, number> = { "Papel": 0, "Mercado Pago": 0, "Infinity Pay": 0, "Outros": 0 };
       let totalFees = 0;
+      let totalChannelFees = 0;
+      let totalMachineFees = 0;
       let totalShipping = 0;
       for (const o of ordersMonth.data ?? []) {
         const c = (o as any).channel ?? "outros";
@@ -64,14 +66,19 @@ function Dashboard() {
         byPayment[p] = byPayment[p] || { count: 0, total: 0 };
         byPayment[p].count++; byPayment[p].total += tot;
         if ((o as any).payment_method_2 && (o as any).payment_amount_1 != null) {
-          byWallet[walletFor(c, p)] += Number((o as any).payment_amount_1 ?? 0);
-          byWallet[walletFor(c, (o as any).payment_method_2)] += Number((o as any).payment_amount_2 ?? 0);
+          const a1 = Number((o as any).payment_amount_1 ?? 0);
+          const a2 = Number((o as any).payment_amount_2 ?? 0);
+          byWallet[walletFor(c, p)] += a1;
+          byWallet[walletFor(c, (o as any).payment_method_2)] += a2;
+          totalMachineFees += infinityPayFeeAmount(c, p, a1) + infinityPayFeeAmount(c, (o as any).payment_method_2, a2);
         } else {
           byWallet[walletFor(c, p)] += tot;
+          totalMachineFees += infinityPayFeeAmount(c, p, tot);
         }
-        totalFees += channelFeeAmount(c, tot);
+        totalChannelFees += channelFeeAmount(c, tot);
         totalShipping += Number((o as any).shipping ?? 0);
       }
+      totalFees = totalChannelFees + totalMachineFees;
       const totalCogs = (itemsMonth.data ?? []).reduce((s: number, i: any) => s + Number(i.unit_cost ?? 0) * Number(i.quantity ?? 0), 0);
       const totalExpenses = (expensesMonth.data ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0);
       const grossProfit = monthTotal - totalCogs;
@@ -85,7 +92,7 @@ function Dashboard() {
       return {
         monthTotal, ordersMonth: ordersMonth.data?.length ?? 0, avgTicket,
         productsCount: products.count ?? 0, lowStock: low, recent: recent.data ?? [],
-        byChannel, byPayment, byWallet, totalFees, totalCogs, totalShipping, realProfit, totalExpenses, profitAfterFees,
+        byChannel, byPayment, byWallet, totalFees, totalChannelFees, totalMachineFees, totalCogs, totalShipping, realProfit, totalExpenses, profitAfterFees,
         grossRevenue, totalDiscount, grossProfit, cogsPct, feesPct, grossMarginPct, realMarginPct,
       };
     },
@@ -103,6 +110,8 @@ function Dashboard() {
       { Métrica: "(=) Lucro bruto", Valor: data?.grossProfit ?? 0 },
       { Métrica: "Margem bruta %", Valor: `${(data?.grossMarginPct ?? 0).toFixed(1)}%` },
       { Métrica: "(−) Comissões plataformas", Valor: data?.totalFees ?? 0 },
+      { Métrica: "    ↳ Comissão de canal (Site/Shopee/TikTok)", Valor: data?.totalChannelFees ?? 0 },
+      { Métrica: "    ↳ Maquininha Infinity Pay", Valor: data?.totalMachineFees ?? 0 },
       { Métrica: "(=) Lucro operacional", Valor: data?.profitAfterFees ?? 0 },
       { Métrica: "(−) Gastos do mês", Valor: data?.totalExpenses ?? 0 },
       { Métrica: "(=) Lucro real", Valor: data?.realProfit ?? 0 },
@@ -132,9 +141,10 @@ function Dashboard() {
         }
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4 mb-6">
         <StatCard accent label="Faturamento" value={brl(data?.monthTotal ?? 0)} icon={DollarSign} hint={`${data?.ordersMonth ?? 0} pedidos`} />
         <StatCard label="CMV %" value={`${(data?.cogsPct ?? 0).toFixed(1)}%`} icon={Percent} hint={brl(data?.totalCogs ?? 0)} />
+        <StatCard label="Gastos do mês" value={brl(data?.totalExpenses ?? 0)} icon={Receipt} hint="Marketing, sacola…" />
         <StatCard label="Lucro real" value={brl(data?.realProfit ?? 0)} icon={TrendingUp} hint={`− CMV − taxas ${brl(data?.totalFees ?? 0)}`} />
         <StatCard label="Margem líquida" value={`${(data?.realMarginPct ?? 0).toFixed(1)}%`} icon={Percent} hint={`Bruta ${(data?.grossMarginPct ?? 0).toFixed(1)}%`} />
         <StatCard label="Ticket médio" value={brl(data?.avgTicket ?? 0)} icon={Banknote} />
@@ -156,11 +166,13 @@ function Dashboard() {
             { label: `CMV (${(data?.cogsPct ?? 0).toFixed(1)}%)`, value: -(data?.totalCogs ?? 0), sign: "−" },
             { label: `Lucro bruto (${(data?.grossMarginPct ?? 0).toFixed(1)}%)`, value: data?.grossProfit ?? 0, total: true },
             { label: "Comissões plataformas", value: -(data?.totalFees ?? 0), sign: "−" },
+            { label: "  ↳ Canal (Site 4% · Shopee 22% · TikTok 12%)", value: -(data?.totalChannelFees ?? 0), sub: true },
+            { label: "  ↳ Maquininha Infinity Pay (Déb 1,49% · Créd 4,29%)", value: -(data?.totalMachineFees ?? 0), sub: true },
             { label: "Lucro operacional", value: data?.profitAfterFees ?? 0, total: true },
             { label: "Gastos do mês (marketing, sacola, chip…)", value: -(data?.totalExpenses ?? 0), sign: "−" },
             { label: `Lucro real (${(data?.realMarginPct ?? 0).toFixed(1)}%)`, value: data?.realProfit ?? 0, total: true, highlight: true },
           ].map((row, i) => (
-            <div key={i} className={`flex items-center justify-between py-2 ${row.total ? "font-semibold" : ""} ${row.highlight ? "text-primary" : ""}`}>
+            <div key={i} className={`flex items-center justify-between py-2 ${row.total ? "font-semibold" : ""} ${row.highlight ? "text-primary" : ""} ${(row as any).sub ? "text-xs text-muted-foreground pl-4" : ""}`}>
               <span className="flex items-center gap-2">
                 {row.sign && <span className="text-muted-foreground w-3 inline-block text-center">{row.sign}</span>}
                 {!row.sign && <span className="w-3" />}
@@ -171,7 +183,7 @@ function Dashboard() {
           ))}
         </div>
         <p className="text-[11px] text-muted-foreground mt-3">
-          CMV usa o custo do produto no momento da venda. Comissões: Site 4% · Shopee 22% · TikTok 12%. Não inclui frete pago à transportadora, impostos, devoluções e despesas fixas.
+          CMV usa o custo do produto no momento da venda. Comissões de canal: Site 4% · Shopee 22% · TikTok 12%. Maquininha Infinity Pay (presencial): Pix 0% · Débito 1,49% · Crédito 4,29%. Não inclui frete pago à transportadora, impostos e devoluções.
         </p>
       </Card>
 

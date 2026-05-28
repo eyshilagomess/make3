@@ -11,9 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus } from "lucide-react";
+import { Plus, Download } from "lucide-react";
 import { toast } from "sonner";
 import { dateTimeBR, MOVEMENT_TYPES, movementTypeLabel } from "@/lib/format";
+import { downloadXLSX } from "@/lib/export";
 
 export const Route = createFileRoute("/_authenticated/estoque")({
   head: () => ({ meta: [{ title: "Movimentações — Make 3" }] }),
@@ -42,6 +43,27 @@ function Page() {
       return data;
     },
   });
+
+  const exportXLSX = () => {
+    const movRows = (movements ?? []).map((m: any) => ({
+      Data: dateTimeBR(m.created_at),
+      Produto: m.products?.name ?? "",
+      Variação: m.product_variants?.name ?? "",
+      SKU: m.products?.sku ?? "",
+      Tipo: movementTypeLabel(m.movement_type),
+      Quantidade: POSITIVE.has(m.movement_type) ? Number(m.quantity) : -Number(m.quantity),
+      Motivo: m.reason ?? "",
+    }));
+    const stockRows = (products ?? []).map((p: any) => ({
+      Produto: p.name,
+      "Tem variações": p.has_variants ? "sim" : "não",
+      "Estoque atual": p.stock ?? 0,
+    }));
+    downloadXLSX(`estoque-${new Date().toISOString().slice(0, 10)}.xlsx`, {
+      "Estoque atual": stockRows,
+      "Movimentações": movRows,
+    });
+  };
   const { data: products } = useQuery({
     queryKey: ["products-min"],
     queryFn: async () => (await supabase.from("products").select("id,name,stock,has_variants").order("name")).data ?? [],
@@ -101,6 +123,8 @@ function Page() {
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
       <PageHeader title="Movimentações de estoque" subtitle="Entradas, saídas e ajustes operacionais"
         actions={
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={exportXLSX}><Download className="h-4 w-4 mr-1" /> Baixar estoque</Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button className="bg-gradient-brand text-primary-foreground border-0 shadow-glow"><Plus className="h-4 w-4 mr-1" /> Nova movimentação</Button></DialogTrigger>
             <DialogContent>
@@ -137,6 +161,7 @@ function Page() {
               </form>
             </DialogContent>
           </Dialog>
+        </div>
         }
       />
 
