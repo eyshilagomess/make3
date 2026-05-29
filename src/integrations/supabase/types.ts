@@ -276,6 +276,36 @@ export type Database = {
           },
         ]
       }
+      product_cost_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          new_cost: number
+          old_cost: number
+          product_id: string
+          reason: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_cost?: number
+          old_cost?: number
+          product_id: string
+          reason?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_cost?: number
+          old_cost?: number
+          product_id?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       product_variants: {
         Row: {
           barcode: string | null
@@ -334,6 +364,7 @@ export type Database = {
       }
       products: {
         Row: {
+          avg_cost: number
           brand: string | null
           category: string | null
           cost: number
@@ -359,6 +390,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avg_cost?: number
           brand?: string | null
           category?: string | null
           cost?: number
@@ -384,6 +416,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avg_cost?: number
           brand?: string | null
           category?: string | null
           cost?: number
