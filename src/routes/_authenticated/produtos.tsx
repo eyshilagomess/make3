@@ -188,9 +188,9 @@ function Page() {
           <Input placeholder="Buscar por nome ou SKU…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
         </div>
         <Table>
-          <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>SKU</TableHead><TableHead>Custo total</TableHead><TableHead>Site</TableHead><TableHead>Shopee</TableHead><TableHead>TikTok</TableHead><TableHead>Estoque</TableHead><TableHead></TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>SKU</TableHead><TableHead>Custo total</TableHead><TableHead>Site</TableHead><TableHead>Shopee</TableHead><TableHead>TikTok</TableHead><TableHead>Lucro un.</TableHead><TableHead>Margem</TableHead><TableHead>Estoque</TableHead><TableHead></TableHead></TableRow></TableHeader>
           <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
             {filtered.map((p: any) => {
               const variants = p.product_variants ?? [];
               const totalStock = p.has_variants ? variants.reduce((s: number, v: any) => s + (v.stock ?? 0), 0) : p.stock;
@@ -213,11 +213,16 @@ function Page() {
                   <TableCell className="font-semibold">{p.price_site != null ? brl(p.price_site) : "—"}</TableCell>
                   <TableCell className="font-semibold">{p.price_shopee != null ? brl(p.price_shopee) : "—"}</TableCell>
                   <TableCell className="font-semibold">{p.price_tiktok != null ? brl(p.price_tiktok) : "—"}</TableCell>
+                  <TableCell className="text-sm tabular-nums">{p.price_site != null ? brl(Number(p.price_site) - ct) : "—"}</TableCell>
+                  <TableCell className="text-sm tabular-nums">{p.price_site != null && Number(p.price_site) > 0 ? `${(((Number(p.price_site) - ct) / Number(p.price_site)) * 100).toFixed(1)}%` : "—"}</TableCell>
                   <TableCell>
                     <Badge variant={low ? "destructive" : "secondary"} className="font-mono">{totalStock}{p.has_variants ? ` (total)` : low ? ` / mín ${p.min_stock}` : ""}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => setHistoryFor({ id: p.id, name: p.name })} title="Histórico de custo">
+                        <History className="h-4 w-4" />
+                      </Button>
                       {p.has_variants && (
                         <Button size="sm" variant="ghost" onClick={() => setVariantsFor({ id: p.id, name: p.name })}>
                           <Layers className="h-4 w-4 mr-1" /> Variações
