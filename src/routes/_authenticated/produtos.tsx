@@ -621,6 +621,45 @@ function VariantsDialog({ open, product, onClose }: { open: boolean; product: { 
 }
 type InvoiceItem = { name: string; sku: string | null; quantity: number; unit_cost: number; category: string | null; brand: string | null };
 
+function CostHistoryDialog({ open, product, onClose }: { open: boolean; product: { id: string; name: string } | null; onClose: () => void }) {
+  const { data } = useQuery({
+    enabled: !!product?.id,
+    queryKey: ["product_cost_history", product?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("product_cost_history").select("*").eq("product_id", product!.id).order("changed_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Histórico de custo — {product?.name}</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">Toda alteração no custo de compra é registrada automaticamente para auditoria.</p>
+        <div className="rounded-md border max-h-[60vh] overflow-auto">
+          <Table>
+            <TableHeader><TableRow><TableHead>Quando</TableHead><TableHead>De</TableHead><TableHead>Para</TableHead><TableHead>Δ</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {(data ?? []).length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6 text-sm">Sem alterações registradas.</TableCell></TableRow>}
+              {(data ?? []).map((h: any) => {
+                const diff = Number(h.new_cost) - Number(h.old_cost);
+                return (
+                  <TableRow key={h.id}>
+                    <TableCell className="text-xs">{new Date(h.changed_at).toLocaleString("pt-BR")}</TableCell>
+                    <TableCell className="tabular-nums">{brl(h.old_cost)}</TableCell>
+                    <TableCell className="tabular-nums font-semibold">{brl(h.new_cost)}</TableCell>
+                    <TableCell className={`tabular-nums ${diff >= 0 ? "text-destructive" : "text-primary"}`}>{diff >= 0 ? "+" : ""}{brl(diff)}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function InvoiceDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const extract = useServerFn(extractFromImage);
   const [busy, setBusy] = useState(false);
