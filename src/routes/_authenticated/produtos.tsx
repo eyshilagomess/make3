@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, Layers, Trash2, Upload, Download, Pencil, Check, X, FileText, Sparkles } from "lucide-react";
+import { History } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { brl } from "@/lib/format";
@@ -48,6 +49,7 @@ function Page() {
   const [importOpen, setImportOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
 
   const { data } = useQuery({
     queryKey: ["products"],
@@ -186,9 +188,9 @@ function Page() {
           <Input placeholder="Buscar por nome ou SKU…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
         </div>
         <Table>
-          <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>SKU</TableHead><TableHead>Custo total</TableHead><TableHead>Site</TableHead><TableHead>Shopee</TableHead><TableHead>TikTok</TableHead><TableHead>Estoque</TableHead><TableHead></TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>SKU</TableHead><TableHead>Custo total</TableHead><TableHead>Site</TableHead><TableHead>Shopee</TableHead><TableHead>TikTok</TableHead><TableHead>Lucro un.</TableHead><TableHead>Margem</TableHead><TableHead>Estoque</TableHead><TableHead></TableHead></TableRow></TableHeader>
           <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
             {filtered.map((p: any) => {
               const variants = p.product_variants ?? [];
               const totalStock = p.has_variants ? variants.reduce((s: number, v: any) => s + (v.stock ?? 0), 0) : p.stock;
@@ -211,11 +213,16 @@ function Page() {
                   <TableCell className="font-semibold">{p.price_site != null ? brl(p.price_site) : "—"}</TableCell>
                   <TableCell className="font-semibold">{p.price_shopee != null ? brl(p.price_shopee) : "—"}</TableCell>
                   <TableCell className="font-semibold">{p.price_tiktok != null ? brl(p.price_tiktok) : "—"}</TableCell>
+                  <TableCell className="text-sm tabular-nums">{p.price_site != null ? brl(Number(p.price_site) - ct) : "—"}</TableCell>
+                  <TableCell className="text-sm tabular-nums">{p.price_site != null && Number(p.price_site) > 0 ? `${(((Number(p.price_site) - ct) / Number(p.price_site)) * 100).toFixed(1)}%` : "—"}</TableCell>
                   <TableCell>
                     <Badge variant={low ? "destructive" : "secondary"} className="font-mono">{totalStock}{p.has_variants ? ` (total)` : low ? ` / mín ${p.min_stock}` : ""}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => setHistoryFor({ id: p.id, name: p.name })} title="Histórico de custo">
+                        <History className="h-4 w-4" />
+                      </Button>
                       {p.has_variants && (
                         <Button size="sm" variant="ghost" onClick={() => setVariantsFor({ id: p.id, name: p.name })}>
                           <Layers className="h-4 w-4 mr-1" /> Variações
@@ -239,6 +246,7 @@ function Page() {
       <VariantsDialog open={!!variantsFor} product={variantsFor} onClose={() => setVariantsFor(null)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <InvoiceDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
+      <CostHistoryDialog open={!!historyFor} product={historyFor} onClose={() => setHistoryFor(null)} />
       <Dialog open={!!editingId} onOpenChange={(v) => !v && (setEditingId(null), setForm(empty))}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Editar produto {editingProduct?.name ? `— ${editingProduct.name}` : ""}</DialogTitle></DialogHeader>
@@ -612,6 +620,45 @@ function VariantsDialog({ open, product, onClose }: { open: boolean; product: { 
   );
 }
 type InvoiceItem = { name: string; sku: string | null; quantity: number; unit_cost: number; category: string | null; brand: string | null };
+
+function CostHistoryDialog({ open, product, onClose }: { open: boolean; product: { id: string; name: string } | null; onClose: () => void }) {
+  const { data } = useQuery({
+    enabled: !!product?.id,
+    queryKey: ["product_cost_history", product?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("product_cost_history").select("*").eq("product_id", product!.id).order("changed_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Histórico de custo — {product?.name}</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">Toda alteração no custo de compra é registrada automaticamente para auditoria.</p>
+        <div className="rounded-md border max-h-[60vh] overflow-auto">
+          <Table>
+            <TableHeader><TableRow><TableHead>Quando</TableHead><TableHead>De</TableHead><TableHead>Para</TableHead><TableHead>Δ</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {(data ?? []).length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6 text-sm">Sem alterações registradas.</TableCell></TableRow>}
+              {(data ?? []).map((h: any) => {
+                const diff = Number(h.new_cost) - Number(h.old_cost);
+                return (
+                  <TableRow key={h.id}>
+                    <TableCell className="text-xs">{new Date(h.changed_at).toLocaleString("pt-BR")}</TableCell>
+                    <TableCell className="tabular-nums">{brl(h.old_cost)}</TableCell>
+                    <TableCell className="tabular-nums font-semibold">{brl(h.new_cost)}</TableCell>
+                    <TableCell className={`tabular-nums ${diff >= 0 ? "text-destructive" : "text-primary"}`}>{diff >= 0 ? "+" : ""}{brl(diff)}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function InvoiceDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const extract = useServerFn(extractFromImage);

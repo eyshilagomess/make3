@@ -17,13 +17,14 @@ import { brl } from "@/lib/format";
 import { downloadXLSX } from "@/lib/export";
 import { useServerFn } from "@tanstack/react-start";
 import { extractFromImage } from "@/lib/extract-invoice.functions";
+import { EXPENSE_CATEGORIES } from "@/lib/finance";
 
 export const Route = createFileRoute("/_authenticated/gastos")({
   head: () => ({ meta: [{ title: "Gastos — Make 3" }] }),
   component: Page,
 });
 
-const CATEGORIES = ["Marketing", "Sacolas / Embalagem", "Chip / Telefone", "Aluguel", "Salários", "Software", "Frete", "Impostos", "Outros"];
+const CATEGORIES = EXPENSE_CATEGORIES;
 
 type Form = { category: string; amount: string; expense_date: string; notes: string; photo_url: string };
 const today = () => new Date().toISOString().slice(0, 10);
