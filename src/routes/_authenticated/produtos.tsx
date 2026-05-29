@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, Layers, Trash2, Upload, Download, Pencil, Check, X, FileText, Sparkles } from "lucide-react";
+import { History } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { brl } from "@/lib/format";
@@ -48,6 +49,7 @@ function Page() {
   const [importOpen, setImportOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
 
   const { data } = useQuery({
     queryKey: ["products"],
@@ -239,6 +241,7 @@ function Page() {
       <VariantsDialog open={!!variantsFor} product={variantsFor} onClose={() => setVariantsFor(null)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <InvoiceDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
+      <CostHistoryDialog open={!!historyFor} product={historyFor} onClose={() => setHistoryFor(null)} />
       <Dialog open={!!editingId} onOpenChange={(v) => !v && (setEditingId(null), setForm(empty))}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Editar produto {editingProduct?.name ? `— ${editingProduct.name}` : ""}</DialogTitle></DialogHeader>
