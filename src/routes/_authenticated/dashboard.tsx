@@ -67,9 +67,9 @@ function Dashboard() {
             .select("order_id,product_id,product_name,quantity,unit_price,unit_cost,subtotal,orders!inner(id,order_code,channel,created_at,closed_at)")
             .in("order_id", orderIds);
 
-      const monthTotal = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.total ?? 0), 0);
-      const grossRevenue = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.subtotal ?? 0), 0);
-      const totalDiscount = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.discount ?? 0), 0);
+      const monthTotal = ((ordersMonth.data ?? []) as any[]).reduce((s: number, o: any) => s + Number(o.total ?? 0), 0);
+      const grossRevenue = ((ordersMonth.data ?? []) as any[]).reduce((s: number, o: any) => s + Number(o.subtotal ?? 0), 0);
+      const totalDiscount = ((ordersMonth.data ?? []) as any[]).reduce((s: number, o: any) => s + Number(o.discount ?? 0), 0);
       const low = (lowStock.data ?? []).filter((p: any) => p.stock <= p.min_stock);
       const byChannel: Record<string, { count: number; total: number }> = {};
       const byPayment: Record<string, { count: number; total: number }> = {};
