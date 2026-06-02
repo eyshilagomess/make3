@@ -89,6 +89,78 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_closings: {
+        Row: {
+          channel_fees: number
+          closed_at: string
+          closed_by: string | null
+          closing_date: string
+          cogs: number
+          created_at: string
+          discounts: number
+          expenses: number
+          gross_profit: number
+          gross_revenue: number
+          id: string
+          machine_fees: number
+          net_profit: number
+          net_revenue: number
+          notes: string | null
+          orders_count: number
+          shipping: number
+          updated_at: string
+          wallet_calculated: Json
+          wallet_counted: Json
+          wallet_diff: Json
+        }
+        Insert: {
+          channel_fees?: number
+          closed_at?: string
+          closed_by?: string | null
+          closing_date: string
+          cogs?: number
+          created_at?: string
+          discounts?: number
+          expenses?: number
+          gross_profit?: number
+          gross_revenue?: number
+          id?: string
+          machine_fees?: number
+          net_profit?: number
+          net_revenue?: number
+          notes?: string | null
+          orders_count?: number
+          shipping?: number
+          updated_at?: string
+          wallet_calculated?: Json
+          wallet_counted?: Json
+          wallet_diff?: Json
+        }
+        Update: {
+          channel_fees?: number
+          closed_at?: string
+          closed_by?: string | null
+          closing_date?: string
+          cogs?: number
+          created_at?: string
+          discounts?: number
+          expenses?: number
+          gross_profit?: number
+          gross_revenue?: number
+          id?: string
+          machine_fees?: number
+          net_profit?: number
+          net_revenue?: number
+          notes?: string | null
+          orders_count?: number
+          shipping?: number
+          updated_at?: string
+          wallet_calculated?: Json
+          wallet_counted?: Json
+          wallet_diff?: Json
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
@@ -192,6 +264,7 @@ export type Database = {
       orders: {
         Row: {
           channel: Database["public"]["Enums"]["sales_channel"]
+          closed_at: string | null
           created_at: string
           created_by: string | null
           customer_id: string | null
@@ -216,6 +289,7 @@ export type Database = {
         }
         Insert: {
           channel?: Database["public"]["Enums"]["sales_channel"]
+          closed_at?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
@@ -242,6 +316,7 @@ export type Database = {
         }
         Update: {
           channel?: Database["public"]["Enums"]["sales_channel"]
+          closed_at?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null

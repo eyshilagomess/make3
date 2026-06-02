@@ -44,18 +44,32 @@ function Dashboard() {
     queryFn: async () => {
       const startDate = new Date(start).toISOString().slice(0, 10);
       const endDate = new Date(end).toISOString().slice(0, 10);
-      const [ordersMonth, recent, lowStock, products, itemsMonth, expensesMonth] = await Promise.all([
-        supabase.from("orders").select("id,order_code,subtotal,discount,total,shipping,channel,payment_method,payment_method_2,payment_amount_1,payment_amount_2,status,created_at,customers(name)").gte("created_at", start).lt("created_at", end),
-        supabase.from("orders").select("id,order_code,total,status,channel,created_at,customers(name)").gte("created_at", start).lt("created_at", end).order("created_at", { ascending: false }).limit(10),
+      // Pedidos contabilizados: PAGOS ou CONCLUÍDOS, usando closed_at como data de competência.
+      const baseOrders = (supabase as any).from("orders")
+        .select("id,order_code,subtotal,discount,total,shipping,channel,payment_method,payment_method_2,payment_amount_1,payment_amount_2,status,payment_status,created_at,closed_at,customers(name)")
+        .gte("closed_at", start).lt("closed_at", end)
+        .or("payment_status.eq.pago,status.eq.concluido");
+      const [ordersMonth, recent, lowStock, products, expensesMonth] = await Promise.all([
+        baseOrders,
+        (supabase as any).from("orders")
+          .select("id,order_code,total,status,payment_status,channel,created_at,closed_at,customers(name)")
+          .gte("closed_at", start).lt("closed_at", end)
+          .or("payment_status.eq.pago,status.eq.concluido")
+          .order("closed_at", { ascending: false }).limit(10),
         supabase.from("products").select("id,name,stock,min_stock,category,cost,price").eq("status", "ativo"),
         supabase.from("products").select("id", { count: "exact", head: true }),
-        supabase.from("order_items").select("order_id,product_id,product_name,quantity,unit_price,unit_cost,subtotal,orders!inner(id,order_code,channel,created_at)").gte("orders.created_at", start).lt("orders.created_at", end),
         (supabase as any).from("expenses").select("amount,category").gte("expense_date", startDate).lt("expense_date", endDate),
       ]);
+      const orderIds = ((ordersMonth.data ?? []) as any[]).map((o) => o.id);
+      const itemsMonth = orderIds.length === 0
+        ? { data: [] as any[] }
+        : await supabase.from("order_items")
+            .select("order_id,product_id,product_name,quantity,unit_price,unit_cost,subtotal,orders!inner(id,order_code,channel,created_at,closed_at)")
+            .in("order_id", orderIds);
 
-      const monthTotal = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.total ?? 0), 0);
-      const grossRevenue = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.subtotal ?? 0), 0);
-      const totalDiscount = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.discount ?? 0), 0);
+      const monthTotal = ((ordersMonth.data ?? []) as any[]).reduce((s: number, o: any) => s + Number(o.total ?? 0), 0);
+      const grossRevenue = ((ordersMonth.data ?? []) as any[]).reduce((s: number, o: any) => s + Number(o.subtotal ?? 0), 0);
+      const totalDiscount = ((ordersMonth.data ?? []) as any[]).reduce((s: number, o: any) => s + Number(o.discount ?? 0), 0);
       const low = (lowStock.data ?? []).filter((p: any) => p.stock <= p.min_stock);
       const byChannel: Record<string, { count: number; total: number }> = {};
       const byPayment: Record<string, { count: number; total: number }> = {};
@@ -359,7 +373,7 @@ function Dashboard() {
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
       <PageHeader
         title="Dashboard"
-        subtitle={`Resumo mensal — ${label} · clique em qualquer número para ver fórmula, origem e registros`}
+        subtitle={`Resumo mensal — ${label} · só pedidos pagos/concluídos · alocados pela data de conclusão (closed_at)`}
         actions={
           <div className="flex items-center gap-2">
             <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-[170px]" />
