@@ -373,7 +373,7 @@ function Dashboard() {
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
       <PageHeader
         title="Dashboard"
-        subtitle={`Resumo mensal — ${label} · clique em qualquer número para ver fórmula, origem e registros`}
+        subtitle={`Resumo mensal — ${label} · só pedidos pagos/concluídos · alocados pela data de conclusão (closed_at)`}
         actions={
           <div className="flex items-center gap-2">
             <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-[170px]" />
