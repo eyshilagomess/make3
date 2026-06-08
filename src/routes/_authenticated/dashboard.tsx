@@ -1,19 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { brl, dateTimeBR, channelLabel, orderStatusLabel, paymentMethodLabel } from "@/lib/format";
 import { DollarSign, ShoppingBag, AlertTriangle, TrendingUp, Download, Wallet, Banknote, Percent, FileBarChart2, Receipt, BarChart3, Boxes, Tag, ChevronRight } from "lucide-react";
 import { downloadXLSX } from "@/lib/export";
 import { walletFor, WALLETS, channelFeeAmount, infinityPayFeeAmount, type Wallet as WalletType } from "@/lib/wallet";
 import { canonicalExpenseCategory, groupExpensesByCategory, fmtPct, pct } from "@/lib/finance";
 import { MetricDrillDown, type DrillColumn } from "@/components/MetricDrillDown";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { rangeFromPreset, DEFAULT_PRESET, toISO, endExclusiveISO, toDateStr, type DateRange } from "@/lib/date-range";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Make 3" }] }),
@@ -21,29 +22,21 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
-  const now = new Date();
-  const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const [range, setRange] = useState<DateRange>(() => rangeFromPreset(DEFAULT_PRESET));
   const [drill, setDrill] = useState<null | {
     label: string; value: string; formula: string; sources: string[]; description?: string;
     rows?: any[]; columns?: DrillColumn<any>[]; breakdown?: { label: string; value: string; hint?: string }[];
     emptyMessage?: string;
   }>(null);
-  const { start, end, label } = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    const s = new Date(y, m - 1, 1);
-    const e = new Date(y, m, 1);
-    return {
-      start: s.toISOString(),
-      end: e.toISOString(),
-      label: s.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
-    };
-  }, [month]);
+  const start = toISO(range.start);
+  const end = endExclusiveISO(range.end);
+  const label = range.label;
 
   const { data } = useQuery({
-    queryKey: ["dashboard", month],
+    queryKey: ["dashboard", start, end],
     queryFn: async () => {
-      const startDate = new Date(start).toISOString().slice(0, 10);
-      const endDate = new Date(end).toISOString().slice(0, 10);
+      const startDate = toDateStr(range.start);
+      const endDate = toDateStr(new Date(range.end.getTime() + 1));
       const [ordersMonth, recent, lowStock, products, itemsMonth, expensesMonth] = await Promise.all([
         supabase.from("orders").select("id,order_code,subtotal,discount,total,shipping,channel,payment_method,payment_method_2,payment_amount_1,payment_amount_2,status,created_at,customers(name)").gte("created_at", start).lt("created_at", end),
         supabase.from("orders").select("id,order_code,total,status,channel,created_at,customers(name)").gte("created_at", start).lt("created_at", end).order("created_at", { ascending: false }).limit(10),
@@ -179,7 +172,7 @@ function Dashboard() {
     const porCanal = Object.entries(data?.byChannel ?? {}).map(([k, v]) => ({ Canal: channelLabel(k), Pedidos: v.count, Total: v.total }));
     const porPagamento = Object.entries(data?.byPayment ?? {}).map(([k, v]) => ({ Pagamento: paymentMethodLabel(k), Pedidos: v.count, Total: v.total }));
     const estoqueBaixo = (data?.lowStock ?? []).map((p: any) => ({ Produto: p.name, Estoque: p.stock, Mínimo: p.min_stock }));
-    downloadXLSX(`dashboard-${month}.xlsx`, { Resumo: resumo, "Onde está o dinheiro": porCarteira, "Por canal": porCanal, "Por pagamento": porPagamento, "Estoque baixo": estoqueBaixo });
+    downloadXLSX(`dashboard-${toDateStr(range.start)}_${toDateStr(range.end)}.xlsx`, { Resumo: resumo, "Onde está o dinheiro": porCarteira, "Por canal": porCanal, "Por pagamento": porPagamento, "Estoque baixo": estoqueBaixo });
   };
 
   // ---------- Drill-down columns ----------
@@ -362,7 +355,7 @@ function Dashboard() {
         subtitle={`Resumo mensal — ${label} · clique em qualquer número para ver fórmula, origem e registros`}
         actions={
           <div className="flex items-center gap-2">
-            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-[170px]" />
+            <DateRangeFilter value={range} onChange={setRange} />
             <Button variant="outline" onClick={exportDashboard}><Download className="h-4 w-4 mr-1" /> Baixar</Button>
           </div>
         }

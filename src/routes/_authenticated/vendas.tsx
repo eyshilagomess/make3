@@ -4,13 +4,14 @@ import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { brl, channelLabel, paymentMethodLabel, orderStatusLabel } from "@/lib/format";
 import { downloadXLSX } from "@/lib/export";
 import { Download } from "lucide-react";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { rangeFromPreset, DEFAULT_PRESET, toISO, endExclusiveISO, toDateStr, type DateRange } from "@/lib/date-range";
 
 export const Route = createFileRoute("/_authenticated/vendas")({
   head: () => ({ meta: [{ title: "Vendas — Make 3" }] }),
@@ -18,17 +19,13 @@ export const Route = createFileRoute("/_authenticated/vendas")({
 });
 
 function Page() {
-  const now = new Date();
-  const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
-  const { start, end, label } = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    const s = new Date(y, m - 1, 1);
-    const e = new Date(y, m, 1);
-    return { start: s.toISOString(), end: e.toISOString(), label: s.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) };
-  }, [month]);
+  const [range, setRange] = useState<DateRange>(() => rangeFromPreset(DEFAULT_PRESET));
+  const start = toISO(range.start);
+  const end = endExclusiveISO(range.end);
+  const label = range.label;
 
   const { data: orders } = useQuery({
-    queryKey: ["vendas", month],
+    queryKey: ["vendas", start, end],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
@@ -56,7 +53,7 @@ function Page() {
   }, [orders]);
 
   const exportar = () => {
-    downloadXLSX(`vendas-${month}.xlsx`, {
+    downloadXLSX(`vendas-${toDateStr(range.start)}_${toDateStr(range.end)}.xlsx`, {
       "Por canal": Object.entries(groups.byChannel).map(([k, v]) => ({ Canal: channelLabel(k), Pedidos: v.count, Total: v.total, "% Receita": groups.total ? (v.total / groups.total) * 100 : 0 })),
       "Por pagamento": Object.entries(groups.byPayment).map(([k, v]) => ({ Pagamento: paymentMethodLabel(k), Pedidos: v.count, Total: v.total })),
       "Por status": Object.entries(groups.byStatus).map(([k, v]) => ({ Status: orderStatusLabel(k), Pedidos: v.count, Total: v.total })),
@@ -87,7 +84,7 @@ function Page() {
         subtitle={`Análise por canal — ${label}`}
         actions={
           <div className="flex items-center gap-2">
-            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-[170px]" />
+            <DateRangeFilter value={range} onChange={setRange} />
             <Button variant="outline" onClick={exportar}><Download className="h-4 w-4 mr-1" /> Baixar</Button>
           </div>
         }

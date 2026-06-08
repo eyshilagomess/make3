@@ -18,6 +18,8 @@ import { downloadXLSX } from "@/lib/export";
 import { useServerFn } from "@tanstack/react-start";
 import { extractFromImage } from "@/lib/extract-invoice.functions";
 import { EXPENSE_CATEGORIES } from "@/lib/finance";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { rangeFromPreset, DEFAULT_PRESET, toDateStr, type DateRange } from "@/lib/date-range";
 
 export const Route = createFileRoute("/_authenticated/gastos")({
   head: () => ({ meta: [{ title: "Gastos — Make 3" }] }),
@@ -39,25 +41,21 @@ async function fileToBase64(file: File): Promise<string> {
 
 function Page() {
   const qc = useQueryClient();
-  const now = new Date();
-  const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const [range, setRange] = useState<DateRange>(() => rangeFromPreset(DEFAULT_PRESET));
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const extract = useServerFn(extractFromImage);
 
-  const { start, end, label } = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    const s = new Date(y, m - 1, 1);
-    const e = new Date(y, m, 1);
-    return { start: s.toISOString().slice(0, 10), end: e.toISOString().slice(0, 10), label: s.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) };
-  }, [month]);
+  const start = toDateStr(range.start);
+  const end = toDateStr(range.end);
+  const label = range.label;
 
   const { data } = useQuery({
-    queryKey: ["expenses", month],
+    queryKey: ["expenses", start, end],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("expenses").select("*").gte("expense_date", start).lt("expense_date", end).order("expense_date", { ascending: false });
+      const { data, error } = await (supabase as any).from("expenses").select("*").gte("expense_date", start).lte("expense_date", end).order("expense_date", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
@@ -152,17 +150,17 @@ function Page() {
   const exportXLSX = () => {
     const detalhes = rows.map(r => ({ Data: r.expense_date, Categoria: r.category, Valor: Number(r.amount), Observação: r.notes ?? "", "Tem recibo": r.photo_url ? "sim" : "não" }));
     const resumo = Object.entries(byCategory).map(([Categoria, Total]) => ({ Categoria, Total }));
-    downloadXLSX(`gastos-${month}.xlsx`, { Resumo: resumo, Detalhes: detalhes });
+    downloadXLSX(`gastos-${start}_${end}.xlsx`, { Resumo: resumo, Detalhes: detalhes });
   };
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
       <PageHeader
         title="Gastos"
-        subtitle={`Despesas mensais — ${label}`}
+        subtitle={`Despesas — ${label}`}
         actions={
           <div className="flex items-center gap-2">
-            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-[170px]" />
+            <DateRangeFilter value={range} onChange={setRange} />
             <Button variant="outline" onClick={exportXLSX}><Download className="h-4 w-4 mr-1" /> Baixar</Button>
             <Button className="bg-gradient-brand text-primary-foreground border-0 shadow-glow" onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo gasto</Button>
             <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditingId(null); setForm(empty()); } }}>

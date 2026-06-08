@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
@@ -12,6 +12,8 @@ import { brl } from "@/lib/format";
 import { channelFeeAmount } from "@/lib/wallet";
 import { TrendingUp, PiggyBank, Wallet, Receipt, Save } from "lucide-react";
 import { toast } from "sonner";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { rangeFromPreset, DEFAULT_PRESET, toISO, endExclusiveISO, toDateStr, type DateRange } from "@/lib/date-range";
 
 export const Route = createFileRoute("/_authenticated/alocacao")({
   head: () => ({ meta: [{ title: "Alocação — Make 3" }] }),
@@ -20,26 +22,20 @@ export const Route = createFileRoute("/_authenticated/alocacao")({
 
 function Page() {
   const qc = useQueryClient();
-  const now = new Date();
-  const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
-  const { start, end, startDate, endDate, label } = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    const s = new Date(y, m - 1, 1);
-    const e = new Date(y, m, 1);
-    return {
-      start: s.toISOString(), end: e.toISOString(),
-      startDate: s.toISOString().slice(0, 10), endDate: e.toISOString().slice(0, 10),
-      label: s.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
-    };
-  }, [month]);
+  const [range, setRange] = useState<DateRange>(() => rangeFromPreset(DEFAULT_PRESET));
+  const start = toISO(range.start);
+  const end = endExclusiveISO(range.end);
+  const startDate = toDateStr(range.start);
+  const endDate = toDateStr(range.end);
+  const label = range.label;
 
   const { data } = useQuery({
-    queryKey: ["alocacao", month],
+    queryKey: ["alocacao", start, end],
     queryFn: async () => {
       const [orders, items, expenses, cfg] = await Promise.all([
         supabase.from("orders").select("id,total,channel,created_at").gte("created_at", start).lt("created_at", end),
         supabase.from("order_items").select("quantity,unit_cost,orders!inner(created_at)").gte("orders.created_at", start).lt("orders.created_at", end),
-        (supabase as any).from("expenses").select("amount").gte("expense_date", startDate).lt("expense_date", endDate),
+        (supabase as any).from("expenses").select("amount").gte("expense_date", startDate).lte("expense_date", endDate),
         (supabase as any).from("allocation_config").select("*").limit(1).maybeSingle(),
       ]);
       const revenue = (orders.data ?? []).reduce((s, o: any) => s + Number(o.total ?? 0), 0);
@@ -86,7 +82,7 @@ function Page() {
       <PageHeader
         title="Alocação do lucro"
         subtitle={`Onde seu dinheiro estará — ${label}`}
-        actions={<Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-[170px]" />}
+        actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
