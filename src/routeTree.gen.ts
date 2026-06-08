@@ -17,7 +17,6 @@ import { Route as AuthenticatedProdutosRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedPedidosRouteImport } from './routes/_authenticated/pedidos'
 import { Route as AuthenticatedGastosRouteImport } from './routes/_authenticated/gastos'
 import { Route as AuthenticatedFornecedoresRouteImport } from './routes/_authenticated/fornecedores'
-import { Route as AuthenticatedFechamentoRouteImport } from './routes/_authenticated/fechamento'
 import { Route as AuthenticatedEstoqueRouteImport } from './routes/_authenticated/estoque'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
@@ -63,11 +62,6 @@ const AuthenticatedFornecedoresRoute =
     path: '/fornecedores',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedFechamentoRoute = AuthenticatedFechamentoRouteImport.update({
-  id: '/fechamento',
-  path: '/fechamento',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedEstoqueRoute = AuthenticatedEstoqueRouteImport.update({
   id: '/estoque',
   path: '/estoque',
@@ -96,7 +90,6 @@ export interface FileRoutesByFullPath {
   '/clientes': typeof AuthenticatedClientesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/estoque': typeof AuthenticatedEstoqueRoute
-  '/fechamento': typeof AuthenticatedFechamentoRoute
   '/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/gastos': typeof AuthenticatedGastosRoute
   '/pedidos': typeof AuthenticatedPedidosRoute
@@ -110,7 +103,6 @@ export interface FileRoutesByTo {
   '/clientes': typeof AuthenticatedClientesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/estoque': typeof AuthenticatedEstoqueRoute
-  '/fechamento': typeof AuthenticatedFechamentoRoute
   '/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/gastos': typeof AuthenticatedGastosRoute
   '/pedidos': typeof AuthenticatedPedidosRoute
@@ -126,7 +118,6 @@ export interface FileRoutesById {
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/estoque': typeof AuthenticatedEstoqueRoute
-  '/_authenticated/fechamento': typeof AuthenticatedFechamentoRoute
   '/_authenticated/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/_authenticated/gastos': typeof AuthenticatedGastosRoute
   '/_authenticated/pedidos': typeof AuthenticatedPedidosRoute
@@ -142,7 +133,6 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/dashboard'
     | '/estoque'
-    | '/fechamento'
     | '/fornecedores'
     | '/gastos'
     | '/pedidos'
@@ -156,7 +146,6 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/dashboard'
     | '/estoque'
-    | '/fechamento'
     | '/fornecedores'
     | '/gastos'
     | '/pedidos'
@@ -171,7 +160,6 @@ export interface FileRouteTypes {
     | '/_authenticated/clientes'
     | '/_authenticated/dashboard'
     | '/_authenticated/estoque'
-    | '/_authenticated/fechamento'
     | '/_authenticated/fornecedores'
     | '/_authenticated/gastos'
     | '/_authenticated/pedidos'
@@ -243,13 +231,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFornecedoresRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/fechamento': {
-      id: '/_authenticated/fechamento'
-      path: '/fechamento'
-      fullPath: '/fechamento'
-      preLoaderRoute: typeof AuthenticatedFechamentoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/estoque': {
       id: '/_authenticated/estoque'
       path: '/estoque'
@@ -286,7 +267,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEstoqueRoute: typeof AuthenticatedEstoqueRoute
-  AuthenticatedFechamentoRoute: typeof AuthenticatedFechamentoRoute
   AuthenticatedFornecedoresRoute: typeof AuthenticatedFornecedoresRoute
   AuthenticatedGastosRoute: typeof AuthenticatedGastosRoute
   AuthenticatedPedidosRoute: typeof AuthenticatedPedidosRoute
@@ -299,7 +279,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEstoqueRoute: AuthenticatedEstoqueRoute,
-  AuthenticatedFechamentoRoute: AuthenticatedFechamentoRoute,
   AuthenticatedFornecedoresRoute: AuthenticatedFornecedoresRoute,
   AuthenticatedGastosRoute: AuthenticatedGastosRoute,
   AuthenticatedPedidosRoute: AuthenticatedPedidosRoute,
@@ -319,13 +298,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
