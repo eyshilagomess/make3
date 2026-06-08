@@ -64,9 +64,9 @@ function Page() {
         if (m2) {
           const a1 = Number(o.payment_amount_1 ?? 0);
           const a2 = Number(o.payment_amount_2 ?? 0);
-          return s + infinityPayFeeAmount(m1, a1) + infinityPayFeeAmount(m2, a2);
+          return s + infinityPayFeeAmount(o.channel, m1, a1) + infinityPayFeeAmount(o.channel, m2, a2);
         }
-        return s + infinityPayFeeAmount(m1, Number(o.total ?? 0));
+        return s + infinityPayFeeAmount(o.channel, m1, Number(o.total ?? 0));
       }, 0);
       const expensesTotal = (expenses.data ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0);
       const realProfit = revenue - cogs - channelFees - machineFees - expensesTotal;
