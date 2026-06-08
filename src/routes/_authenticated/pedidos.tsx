@@ -20,6 +20,8 @@ import {
   CHANNELS, PAYMENT_METHODS, PAYMENT_STATUSES, ORDER_STATUSES,
   channelLabel, paymentMethodLabel, paymentStatusLabel, orderStatusLabel,
 } from "@/lib/format";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { rangeFromPreset, DEFAULT_PRESET, toISO, endExclusiveISO, type DateRange } from "@/lib/date-range";
 
 export const Route = createFileRoute("/_authenticated/pedidos")({
   head: () => ({ meta: [{ title: "Pedidos — Make 3" }] }),
@@ -55,6 +57,7 @@ const emptyForm: FormState = {
 function Page() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [range, setRange] = useState<DateRange>(() => rangeFromPreset(DEFAULT_PRESET));
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [detailsId, setDetailsId] = useState<string | null>(null);
@@ -68,9 +71,11 @@ function Page() {
   const [uploading, setUploading] = useState(false);
 
   const { data: orders } = useQuery({
-    queryKey: ["orders"],
+    queryKey: ["orders", toISO(range.start), endExclusiveISO(range.end)],
     queryFn: async () => {
-      const { data, error } = await supabase.from("orders").select("*, customers(name), order_items(id)").order("created_at", { ascending: false }).limit(200);
+      const { data, error } = await supabase.from("orders").select("*, customers(name), order_items(id)")
+        .gte("created_at", toISO(range.start)).lt("created_at", endExclusiveISO(range.end))
+        .order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
       return data;
     },
@@ -326,9 +331,10 @@ function Page() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
-      <PageHeader title="Pedidos" subtitle="Cadastro e acompanhamento de vendas"
+      <PageHeader title="Pedidos" subtitle={`Cadastro e acompanhamento — ${range.label}`}
         actions={
           <div className="flex items-center gap-2">
+            <DateRangeFilter value={range} onChange={setRange} />
             <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importOrders.mutate(f); e.target.value = ""; }} />
             <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={importOrders.isPending}><Upload className="h-4 w-4 mr-1" /> Importar</Button>
             <Button variant="outline" onClick={exportOrders}><Download className="h-4 w-4 mr-1" /> Baixar</Button>
