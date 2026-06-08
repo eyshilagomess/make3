@@ -172,7 +172,7 @@ function Dashboard() {
     const porCanal = Object.entries(data?.byChannel ?? {}).map(([k, v]) => ({ Canal: channelLabel(k), Pedidos: v.count, Total: v.total }));
     const porPagamento = Object.entries(data?.byPayment ?? {}).map(([k, v]) => ({ Pagamento: paymentMethodLabel(k), Pedidos: v.count, Total: v.total }));
     const estoqueBaixo = (data?.lowStock ?? []).map((p: any) => ({ Produto: p.name, Estoque: p.stock, Mínimo: p.min_stock }));
-    downloadXLSX(`dashboard-${month}.xlsx`, { Resumo: resumo, "Onde está o dinheiro": porCarteira, "Por canal": porCanal, "Por pagamento": porPagamento, "Estoque baixo": estoqueBaixo });
+    downloadXLSX(`dashboard-${toDateStr(range.start)}_${toDateStr(range.end)}.xlsx`, { Resumo: resumo, "Onde está o dinheiro": porCarteira, "Por canal": porCanal, "Por pagamento": porPagamento, "Estoque baixo": estoqueBaixo });
   };
 
   // ---------- Drill-down columns ----------
@@ -355,7 +355,7 @@ function Dashboard() {
         subtitle={`Resumo mensal — ${label} · clique em qualquer número para ver fórmula, origem e registros`}
         actions={
           <div className="flex items-center gap-2">
-            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-[170px]" />
+            <DateRangeFilter value={range} onChange={setRange} />
             <Button variant="outline" onClick={exportDashboard}><Download className="h-4 w-4 mr-1" /> Baixar</Button>
           </div>
         }
