@@ -46,18 +46,27 @@ function Dashboard() {
         (supabase as any).from("expenses").select("amount,category").gte("expense_date", startDate).lt("expense_date", endDate),
       ]);
 
-      const monthTotal = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.total ?? 0), 0);
-      const grossRevenue = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.subtotal ?? 0), 0);
-      const totalDiscount = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.discount ?? 0), 0);
+      // Fonte da verdade: pedidos NÃO cancelados. Pedidos cancelados não entram em nenhum cálculo financeiro.
+      const allOrders = (ordersMonth.data ?? []) as any[];
+      const cancelledOrders = allOrders.filter((o) => o.status === "cancelado");
+      const validOrders = allOrders.filter((o) => o.status !== "cancelado");
+      const validOrderIds = new Set(validOrders.map((o) => o.id));
+      const validItems = ((itemsMonth.data ?? []) as any[]).filter((i) => validOrderIds.has(i.order_id));
+
+      const grossRevenue = validOrders.reduce((s, o) => s + Number(o.subtotal ?? 0), 0);
+      const totalDiscount = validOrders.reduce((s, o) => s + Number(o.discount ?? 0), 0);
+      const netProductRevenue = grossRevenue - totalDiscount; // Receita líquida de produtos (DRE)
+      const monthTotal = validOrders.reduce((s, o) => s + Number(o.total ?? 0), 0); // Faturamento total (com frete)
       const low = (lowStock.data ?? []).filter((p: any) => p.stock <= p.min_stock);
       const byChannel: Record<string, { count: number; total: number }> = {};
       const byPayment: Record<string, { count: number; total: number }> = {};
       const byWallet: Record<WalletType, number> = { "Papel": 0, "Mercado Pago": 0, "Infinity Pay": 0, "Outros": 0 };
+      const byWalletFees: Record<WalletType, number> = { "Papel": 0, "Mercado Pago": 0, "Infinity Pay": 0, "Outros": 0 };
       let totalFees = 0;
       let totalChannelFees = 0;
       let totalMachineFees = 0;
       let totalShipping = 0;
-      for (const o of ordersMonth.data ?? []) {
+      for (const o of validOrders) {
         const c = (o as any).channel ?? "outros";
         const p = (o as any).payment_method ?? "outros";
         const tot = Number((o as any).total ?? 0);
@@ -65,38 +74,57 @@ function Dashboard() {
         byChannel[c].count++; byChannel[c].total += tot;
         byPayment[p] = byPayment[p] || { count: 0, total: 0 };
         byPayment[p].count++; byPayment[p].total += tot;
+        const chFee = channelFeeAmount(c, tot);
         if ((o as any).payment_method_2 && (o as any).payment_amount_1 != null) {
           const a1 = Number((o as any).payment_amount_1 ?? 0);
           const a2 = Number((o as any).payment_amount_2 ?? 0);
-          byWallet[walletFor(c, p)] += a1;
-          byWallet[walletFor(c, (o as any).payment_method_2)] += a2;
-          totalMachineFees += infinityPayFeeAmount(c, p, a1) + infinityPayFeeAmount(c, (o as any).payment_method_2, a2);
+          const w1 = walletFor(c, p);
+          const w2 = walletFor(c, (o as any).payment_method_2);
+          byWallet[w1] += a1;
+          byWallet[w2] += a2;
+          const m1 = infinityPayFeeAmount(c, p, a1);
+          const m2 = infinityPayFeeAmount(c, (o as any).payment_method_2, a2);
+          byWalletFees[w1] += m1 + (tot > 0 ? (chFee * a1) / tot : 0);
+          byWalletFees[w2] += m2 + (tot > 0 ? (chFee * a2) / tot : 0);
+          totalMachineFees += m1 + m2;
         } else {
-          byWallet[walletFor(c, p)] += tot;
-          totalMachineFees += infinityPayFeeAmount(c, p, tot);
+          const w = walletFor(c, p);
+          byWallet[w] += tot;
+          const mf = infinityPayFeeAmount(c, p, tot);
+          byWalletFees[w] += mf + chFee;
+          totalMachineFees += mf;
         }
-        totalChannelFees += channelFeeAmount(c, tot);
+        totalChannelFees += chFee;
         totalShipping += Number((o as any).shipping ?? 0);
       }
       totalFees = totalChannelFees + totalMachineFees;
-      const totalCogs = (itemsMonth.data ?? []).reduce((s: number, i: any) => s + Number(i.unit_cost ?? 0) * Number(i.quantity ?? 0), 0);
+      const totalCogs = validItems.reduce((s, i) => s + Number(i.unit_cost ?? 0) * Number(i.quantity ?? 0), 0);
       const totalExpenses = (expensesMonth.data ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0);
       const expensesByCat = groupExpensesByCategory((expensesMonth.data ?? []) as any[]);
-      const grossProfit = monthTotal - totalCogs;
-      const profitAfterFees = grossProfit - totalFees;
+      // DRE corrigida: lucro bruto = receita líquida de PRODUTOS − CMV (sem frete cobrado).
+      const grossProfit = netProductRevenue - totalCogs;
+      const profitAfterFees = grossProfit + totalShipping - totalFees; // adiciona frete cobrado e desconta taxas
       const realProfit = profitAfterFees - totalExpenses;
-      const cogsPct = monthTotal > 0 ? (totalCogs / monthTotal) * 100 : 0;
+      const cogsPct = netProductRevenue > 0 ? (totalCogs / netProductRevenue) * 100 : 0;
       const feesPct = monthTotal > 0 ? (totalFees / monthTotal) * 100 : 0;
-      const grossMarginPct = monthTotal > 0 ? (grossProfit / monthTotal) * 100 : 0;
+      const grossMarginPct = netProductRevenue > 0 ? (grossProfit / netProductRevenue) * 100 : 0;
       const realMarginPct = monthTotal > 0 ? (realProfit / monthTotal) * 100 : 0;
-      const avgTicket = (ordersMonth.data?.length ?? 0) > 0 ? monthTotal / (ordersMonth.data!.length) : 0;
+      const avgTicket = validOrders.length > 0 ? monthTotal / validOrders.length : 0;
 
       // Indicadores por produto/categoria
+      // Busca categoria também de produtos inativos para não agrupar errado em "Sem categoria".
+      const itemProductIds = Array.from(new Set(validItems.map((i) => i.product_id).filter(Boolean)));
+      let allProductsCat: any[] = [];
+      if (itemProductIds.length > 0) {
+        const res = await supabase.from("products").select("id,name,stock,min_stock,category,cost,price").in("id", itemProductIds);
+        allProductsCat = res.data ?? [];
+      }
       const productMap = new Map<string, any>();
       for (const p of (lowStock.data ?? []) as any[]) productMap.set(p.id, p);
+      for (const p of allProductsCat) productMap.set(p.id, { ...productMap.get(p.id), ...p });
       const byProduct: Record<string, { id: string; name: string; category: string | null; qty: number; revenue: number; cogs: number; profit: number }> = {};
       const byCategory: Record<string, { qty: number; revenue: number; cogs: number; profit: number }> = {};
-      for (const it of (itemsMonth.data ?? []) as any[]) {
+      for (const it of validItems) {
         const pid = it.product_id ?? "—";
         const prod = productMap.get(pid);
         const cat = (prod?.category ?? "Sem categoria") as string;
@@ -116,15 +144,16 @@ function Dashboard() {
       }
       const productsRanked = Object.values(byProduct).sort((a, b) => b.profit - a.profit);
       const categoriesRanked = Object.entries(byCategory).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.profit - a.profit);
-      // Margem média (por pedido)
-      const perOrderMargins: number[] = (ordersMonth.data ?? []).map((o: any) => {
-        const itemsOfOrder = ((itemsMonth.data ?? []) as any[]).filter((i) => i.order_id === o.id);
+      // Margem média (por pedido) — ignora cancelados e pedidos com total=0
+      const validForMargin = validOrders.filter((o: any) => Number(o.total ?? 0) > 0);
+      const perOrderMargins: number[] = validForMargin.map((o: any) => {
+        const itemsOfOrder = validItems.filter((i) => i.order_id === o.id);
         const cogs = itemsOfOrder.reduce((s, i) => s + Number(i.unit_cost ?? 0) * Number(i.quantity ?? 0), 0);
         const fees = channelFeeAmount(o.channel, Number(o.total ?? 0)) + ((o.payment_method_2 && o.payment_amount_1 != null)
           ? infinityPayFeeAmount(o.channel, o.payment_method, Number(o.payment_amount_1 ?? 0)) + infinityPayFeeAmount(o.channel, o.payment_method_2, Number(o.payment_amount_2 ?? 0))
           : infinityPayFeeAmount(o.channel, o.payment_method, Number(o.total ?? 0)));
         const profit = Number(o.total ?? 0) - cogs - fees;
-        return Number(o.total ?? 0) > 0 ? (profit / Number(o.total)) * 100 : 0;
+        return (profit / Number(o.total)) * 100;
       });
       const avgMarginPct = perOrderMargins.length > 0 ? perOrderMargins.reduce((a, b) => a + b, 0) / perOrderMargins.length : 0;
       // Giro de estoque (por produto) = qty vendida / max(estoque atual, 1)
@@ -135,11 +164,11 @@ function Dashboard() {
       }).sort((a, b) => b.turnover - a.turnover);
 
       return {
-        monthTotal, ordersMonth: ordersMonth.data?.length ?? 0, avgTicket,
+        monthTotal, ordersMonth: validOrders.length, cancelledCount: cancelledOrders.length, avgTicket,
         productsCount: products.count ?? 0, lowStock: low, recent: recent.data ?? [],
-        byChannel, byPayment, byWallet, totalFees, totalChannelFees, totalMachineFees, totalCogs, totalShipping, realProfit, totalExpenses, profitAfterFees,
-        grossRevenue, totalDiscount, grossProfit, cogsPct, feesPct, grossMarginPct, realMarginPct,
-        expensesByCat, ordersList: ordersMonth.data ?? [], itemsList: itemsMonth.data ?? [], expensesList: expensesMonth.data ?? [],
+        byChannel, byPayment, byWallet, byWalletFees, totalFees, totalChannelFees, totalMachineFees, totalCogs, totalShipping, realProfit, totalExpenses, profitAfterFees,
+        grossRevenue, totalDiscount, netProductRevenue, grossProfit, cogsPct, feesPct, grossMarginPct, realMarginPct,
+        expensesByCat, ordersList: validOrders, itemsList: validItems, expensesList: expensesMonth.data ?? [],
         productsRanked, categoriesRanked, turnover, avgMarginPct,
       };
     },
