@@ -227,24 +227,29 @@ function Dashboard() {
 
   // ---------- Drill openers ----------
   const openRevenue = () => setDrill({
-    label: "Receita líquida", value: brl(data?.monthTotal ?? 0),
-    formula: "Σ orders.total (no mês)\n= Σ (subtotal − discount + shipping)",
-    sources: ["orders.total", "orders.created_at"],
-    description: "Soma dos totais de todos os pedidos faturados no período.",
+    label: "Faturamento (pedidos não cancelados)", value: brl(data?.monthTotal ?? 0),
+    formula: "Σ orders.total WHERE status ≠ 'cancelado'\n= Σ (subtotal − discount + shipping)",
+    sources: ["orders.total", "orders.status", "orders.created_at"],
+    description: `Soma dos totais dos pedidos válidos no período. ${data?.cancelledCount ? `${data?.cancelledCount} pedido(s) cancelado(s) excluído(s).` : ""}`.trim(),
     rows: data?.ordersList, columns: ordersCols,
     breakdown: [
       { label: "Receita bruta", value: brl(data?.grossRevenue ?? 0), hint: "Σ subtotal" },
       { label: "(−) Descontos", value: brl(data?.totalDiscount ?? 0) },
+      { label: "(=) Receita líquida produtos", value: brl(data?.netProductRevenue ?? 0), hint: "base do CMV %" },
       { label: "(+) Frete cobrado", value: brl(data?.totalShipping ?? 0) },
+      { label: "(=) Faturamento total", value: brl(data?.monthTotal ?? 0) },
     ],
   });
   const openCogs = () => setDrill({
     label: "CMV (custo das mercadorias vendidas)", value: brl(data?.totalCogs ?? 0),
-    formula: "Σ order_items.unit_cost × quantity\nCMV % = CMV / Receita líquida × 100",
-    sources: ["order_items.unit_cost", "order_items.quantity"],
+    formula: "Σ order_items.unit_cost × quantity (pedidos não cancelados)\nCMV % = CMV / Receita líquida de produtos × 100",
+    sources: ["order_items.unit_cost", "order_items.quantity", "orders.status"],
     description: "Apenas o custo do produto vendido. Embalagem, brindes e frete subsidiado têm categorias próprias.",
     rows: data?.itemsList, columns: itemsCols,
-    breakdown: [{ label: "CMV %", value: fmtPct(data?.cogsPct ?? 0), hint: "em relação à receita líquida" }],
+    breakdown: [
+      { label: "CMV %", value: fmtPct(data?.cogsPct ?? 0), hint: "sobre receita líquida de produtos" },
+      { label: "Receita líquida produtos", value: brl(data?.netProductRevenue ?? 0) },
+    ],
   });
   const openFees = () => setDrill({
     label: "Taxas de pagamento", value: brl(data?.totalFees ?? 0),
@@ -275,11 +280,13 @@ function Dashboard() {
   });
   const openRealProfit = () => setDrill({
     label: "Lucro líquido (real)", value: brl(data?.realProfit ?? 0),
-    formula: "Receita líquida − CMV − Taxas − Σ Despesas\nMargem líquida = Lucro líquido / Receita líquida × 100",
+    formula: "Receita líquida produtos − CMV\n  + Frete cobrado\n  − Taxas canal − Taxas maquininha\n  − Σ Despesas operacionais\nMargem líquida = Lucro líquido / Faturamento × 100",
     sources: ["orders", "order_items", "expenses"],
     breakdown: [
-      { label: "Receita líquida", value: brl(data?.monthTotal ?? 0) },
+      { label: "Receita líquida produtos", value: brl(data?.netProductRevenue ?? 0) },
       { label: "(−) CMV", value: brl(data?.totalCogs ?? 0) },
+      { label: "(=) Lucro bruto", value: brl(data?.grossProfit ?? 0) },
+      { label: "(+) Frete cobrado", value: brl(data?.totalShipping ?? 0) },
       { label: "(−) Taxas", value: brl(data?.totalFees ?? 0) },
       { label: "(−) Despesas", value: brl(data?.totalExpenses ?? 0) },
       { label: "Margem líquida", value: fmtPct(data?.realMarginPct ?? 0) },
@@ -287,21 +294,21 @@ function Dashboard() {
   });
   const openGrossProfit = () => setDrill({
     label: "Lucro bruto", value: brl(data?.grossProfit ?? 0),
-    formula: "Receita líquida − CMV\nMargem bruta = Lucro bruto / Receita líquida × 100",
-    sources: ["orders.total", "order_items.unit_cost"],
+    formula: "Receita líquida produtos − CMV\nMargem bruta = Lucro bruto / Receita líquida produtos × 100",
+    sources: ["orders.subtotal", "orders.discount", "order_items.unit_cost"],
     breakdown: [
-      { label: "Receita líquida", value: brl(data?.monthTotal ?? 0) },
+      { label: "Receita líquida produtos", value: brl(data?.netProductRevenue ?? 0) },
       { label: "(−) CMV", value: brl(data?.totalCogs ?? 0) },
       { label: "Margem bruta", value: fmtPct(data?.grossMarginPct ?? 0) },
     ],
   });
   const openTicket = () => setDrill({
     label: "Ticket médio", value: brl(data?.avgTicket ?? 0),
-    formula: "Receita líquida / nº pedidos",
-    sources: ["orders.total", "COUNT(orders)"],
+    formula: "Faturamento / nº pedidos válidos (não cancelados)",
+    sources: ["orders.total", "orders.status"],
     rows: data?.ordersList, columns: ordersCols,
     breakdown: [
-      { label: "Receita líquida", value: brl(data?.monthTotal ?? 0) },
+      { label: "Faturamento", value: brl(data?.monthTotal ?? 0) },
       { label: "Pedidos", value: String(data?.ordersMonth ?? 0) },
     ],
   });
@@ -328,11 +335,18 @@ function Dashboard() {
       }
       return walletFor(o.channel, o.payment_method) === w;
     });
+    const bruto = Number(data?.byWallet?.[w as WalletType] ?? 0);
+    const taxas = Number(data?.byWalletFees?.[w as WalletType] ?? 0);
     setDrill({
-      label: `Carteira — ${w}`, value: brl(data?.byWallet?.[w as WalletType] ?? 0),
-      formula: "Σ valor recebido pelos pedidos cujo método cai nesta carteira",
+      label: `Carteira — ${w}`, value: brl(bruto - taxas),
+      formula: "Bruto recebido − (taxa de canal + taxa de maquininha) atribuída à carteira\nDescrição: valor que efetivamente cai (líquido) descontando taxas.",
       sources: ["orders.channel", "orders.payment_method"],
       rows, columns: ordersCols,
+      breakdown: [
+        { label: "Bruto recebido", value: brl(bruto) },
+        { label: "(−) Taxas", value: brl(taxas) },
+        { label: "(=) Líquido", value: brl(bruto - taxas) },
+      ],
     });
   };
   const openTopProducts = (mode: "top" | "bottom") => {
