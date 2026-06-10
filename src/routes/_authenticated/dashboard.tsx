@@ -424,10 +424,10 @@ function Dashboard() {
           {([
             { label: "Receita bruta (produtos)", value: data?.grossRevenue ?? 0, sign: "+", onClick: openRevenue },
             { label: "Descontos concedidos", value: -(data?.totalDiscount ?? 0), sign: "−", onClick: openRevenue },
-            { label: "Frete cobrado", value: data?.totalShipping ?? 0, sign: "+", onClick: openRevenue },
-            { label: "Receita líquida", value: data?.monthTotal ?? 0, total: true, onClick: openRevenue },
+            { label: "Receita líquida de produtos", value: data?.netProductRevenue ?? 0, total: true, onClick: openRevenue },
             { label: `CMV (${(data?.cogsPct ?? 0).toFixed(1)}%) — apenas custo do produto`, value: -(data?.totalCogs ?? 0), sign: "−", onClick: openCogs },
             { label: `Lucro bruto (${(data?.grossMarginPct ?? 0).toFixed(1)}%)`, value: data?.grossProfit ?? 0, total: true, onClick: openGrossProfit },
+            { label: "Frete cobrado", value: data?.totalShipping ?? 0, sign: "+", onClick: openRevenue },
             { label: "Taxas de canal (Site 4% · Shopee 22% · TikTok 12%)", value: -(data?.totalChannelFees ?? 0), sign: "−", onClick: openFees },
             { label: "Taxas de maquininha Infinity Pay (Déb 1,49% · Créd 4,29%)", value: -(data?.totalMachineFees ?? 0), sign: "−", onClick: openFees },
             { label: "Embalagem (sacola, papel seda, adesivo, caixa)", value: -(data?.expensesByCat?.["Embalagem"] ?? 0), sign: "−", onClick: () => openExpenseCat("Embalagem") },
@@ -454,7 +454,7 @@ function Dashboard() {
           ))}
         </div>
         <p className="text-[11px] text-muted-foreground mt-3">
-          CMV usa apenas o custo do produto vendido. Embalagem, brindes, frete subsidiado, marketing e operacional têm categorias próprias e vêm de Gastos. Taxas de canal (Site/Shopee/TikTok) e Infinity Pay (presencial) são calculadas em cima de cada pedido.
+          Pedidos cancelados ({data?.cancelledCount ?? 0}) NÃO entram em nenhum cálculo financeiro. CMV % é calculado sobre a Receita líquida de produtos (sem frete). Frete cobrado entra abaixo do lucro bruto, junto às demais entradas/saídas operacionais. Embalagem, brindes, frete subsidiado, marketing e operacional vêm de Gastos.
         </p>
       </Card>
 
@@ -466,7 +466,9 @@ function Dashboard() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {WALLETS.map((w) => {
-            const val = data?.byWallet?.[w] ?? 0;
+            const bruto = data?.byWallet?.[w] ?? 0;
+            const taxas = data?.byWalletFees?.[w] ?? 0;
+            const liquido = bruto - taxas;
             const hint = w === "Papel" ? "Dinheiro físico"
               : w === "Mercado Pago" ? "Site · Shopee · TikTok"
               : w === "Infinity Pay" ? "Pix/Cartão presencial"
@@ -474,12 +476,14 @@ function Dashboard() {
             return (
               <button key={w} type="button" onClick={() => openWallet(w)} className="text-left rounded-lg border border-border bg-muted/30 p-4 transition hover:bg-muted hover:shadow">
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">{w}</div>
-                <div className="text-2xl font-bold mt-1">{brl(val)}</div>
+                <div className="text-2xl font-bold mt-1">{brl(liquido)}</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">Bruto {brl(bruto)} · Taxas {brl(taxas)}</div>
                 <div className="text-[11px] text-muted-foreground mt-1">{hint}</div>
               </button>
             );
           })}
         </div>
+        <p className="text-[11px] text-muted-foreground mt-3">Valor em destaque = líquido (já desconta comissão de canal e taxa da maquininha). Bruto = entrou na carteira; Taxas = quanto saiu para Site/Shopee/TikTok/Infinity Pay.</p>
       </Card>
 
       <Card className="p-5 shadow-card mb-6">
