@@ -46,18 +46,27 @@ function Dashboard() {
         (supabase as any).from("expenses").select("amount,category").gte("expense_date", startDate).lt("expense_date", endDate),
       ]);
 
-      const monthTotal = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.total ?? 0), 0);
-      const grossRevenue = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.subtotal ?? 0), 0);
-      const totalDiscount = (ordersMonth.data ?? []).reduce((s, o: any) => s + Number(o.discount ?? 0), 0);
+      // Fonte da verdade: pedidos NÃO cancelados. Pedidos cancelados não entram em nenhum cálculo financeiro.
+      const allOrders = (ordersMonth.data ?? []) as any[];
+      const cancelledOrders = allOrders.filter((o) => o.status === "cancelado");
+      const validOrders = allOrders.filter((o) => o.status !== "cancelado");
+      const validOrderIds = new Set(validOrders.map((o) => o.id));
+      const validItems = ((itemsMonth.data ?? []) as any[]).filter((i) => validOrderIds.has(i.order_id));
+
+      const grossRevenue = validOrders.reduce((s, o) => s + Number(o.subtotal ?? 0), 0);
+      const totalDiscount = validOrders.reduce((s, o) => s + Number(o.discount ?? 0), 0);
+      const netProductRevenue = grossRevenue - totalDiscount; // Receita líquida de produtos (DRE)
+      const monthTotal = validOrders.reduce((s, o) => s + Number(o.total ?? 0), 0); // Faturamento total (com frete)
       const low = (lowStock.data ?? []).filter((p: any) => p.stock <= p.min_stock);
       const byChannel: Record<string, { count: number; total: number }> = {};
       const byPayment: Record<string, { count: number; total: number }> = {};
       const byWallet: Record<WalletType, number> = { "Papel": 0, "Mercado Pago": 0, "Infinity Pay": 0, "Outros": 0 };
+      const byWalletFees: Record<WalletType, number> = { "Papel": 0, "Mercado Pago": 0, "Infinity Pay": 0, "Outros": 0 };
       let totalFees = 0;
       let totalChannelFees = 0;
       let totalMachineFees = 0;
       let totalShipping = 0;
-      for (const o of ordersMonth.data ?? []) {
+      for (const o of validOrders) {
         const c = (o as any).channel ?? "outros";
         const p = (o as any).payment_method ?? "outros";
         const tot = Number((o as any).total ?? 0);
@@ -65,38 +74,57 @@ function Dashboard() {
         byChannel[c].count++; byChannel[c].total += tot;
         byPayment[p] = byPayment[p] || { count: 0, total: 0 };
         byPayment[p].count++; byPayment[p].total += tot;
+        const chFee = channelFeeAmount(c, tot);
         if ((o as any).payment_method_2 && (o as any).payment_amount_1 != null) {
           const a1 = Number((o as any).payment_amount_1 ?? 0);
           const a2 = Number((o as any).payment_amount_2 ?? 0);
-          byWallet[walletFor(c, p)] += a1;
-          byWallet[walletFor(c, (o as any).payment_method_2)] += a2;
-          totalMachineFees += infinityPayFeeAmount(c, p, a1) + infinityPayFeeAmount(c, (o as any).payment_method_2, a2);
+          const w1 = walletFor(c, p);
+          const w2 = walletFor(c, (o as any).payment_method_2);
+          byWallet[w1] += a1;
+          byWallet[w2] += a2;
+          const m1 = infinityPayFeeAmount(c, p, a1);
+          const m2 = infinityPayFeeAmount(c, (o as any).payment_method_2, a2);
+          byWalletFees[w1] += m1 + (tot > 0 ? (chFee * a1) / tot : 0);
+          byWalletFees[w2] += m2 + (tot > 0 ? (chFee * a2) / tot : 0);
+          totalMachineFees += m1 + m2;
         } else {
-          byWallet[walletFor(c, p)] += tot;
-          totalMachineFees += infinityPayFeeAmount(c, p, tot);
+          const w = walletFor(c, p);
+          byWallet[w] += tot;
+          const mf = infinityPayFeeAmount(c, p, tot);
+          byWalletFees[w] += mf + chFee;
+          totalMachineFees += mf;
         }
-        totalChannelFees += channelFeeAmount(c, tot);
+        totalChannelFees += chFee;
         totalShipping += Number((o as any).shipping ?? 0);
       }
       totalFees = totalChannelFees + totalMachineFees;
-      const totalCogs = (itemsMonth.data ?? []).reduce((s: number, i: any) => s + Number(i.unit_cost ?? 0) * Number(i.quantity ?? 0), 0);
+      const totalCogs = validItems.reduce((s, i) => s + Number(i.unit_cost ?? 0) * Number(i.quantity ?? 0), 0);
       const totalExpenses = (expensesMonth.data ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0);
       const expensesByCat = groupExpensesByCategory((expensesMonth.data ?? []) as any[]);
-      const grossProfit = monthTotal - totalCogs;
-      const profitAfterFees = grossProfit - totalFees;
+      // DRE corrigida: lucro bruto = receita líquida de PRODUTOS − CMV (sem frete cobrado).
+      const grossProfit = netProductRevenue - totalCogs;
+      const profitAfterFees = grossProfit + totalShipping - totalFees; // adiciona frete cobrado e desconta taxas
       const realProfit = profitAfterFees - totalExpenses;
-      const cogsPct = monthTotal > 0 ? (totalCogs / monthTotal) * 100 : 0;
+      const cogsPct = netProductRevenue > 0 ? (totalCogs / netProductRevenue) * 100 : 0;
       const feesPct = monthTotal > 0 ? (totalFees / monthTotal) * 100 : 0;
-      const grossMarginPct = monthTotal > 0 ? (grossProfit / monthTotal) * 100 : 0;
+      const grossMarginPct = netProductRevenue > 0 ? (grossProfit / netProductRevenue) * 100 : 0;
       const realMarginPct = monthTotal > 0 ? (realProfit / monthTotal) * 100 : 0;
-      const avgTicket = (ordersMonth.data?.length ?? 0) > 0 ? monthTotal / (ordersMonth.data!.length) : 0;
+      const avgTicket = validOrders.length > 0 ? monthTotal / validOrders.length : 0;
 
       // Indicadores por produto/categoria
+      // Busca categoria também de produtos inativos para não agrupar errado em "Sem categoria".
+      const itemProductIds = Array.from(new Set(validItems.map((i) => i.product_id).filter(Boolean)));
+      let allProductsCat: any[] = [];
+      if (itemProductIds.length > 0) {
+        const res = await supabase.from("products").select("id,name,stock,min_stock,category,cost,price").in("id", itemProductIds);
+        allProductsCat = res.data ?? [];
+      }
       const productMap = new Map<string, any>();
       for (const p of (lowStock.data ?? []) as any[]) productMap.set(p.id, p);
+      for (const p of allProductsCat) productMap.set(p.id, { ...productMap.get(p.id), ...p });
       const byProduct: Record<string, { id: string; name: string; category: string | null; qty: number; revenue: number; cogs: number; profit: number }> = {};
       const byCategory: Record<string, { qty: number; revenue: number; cogs: number; profit: number }> = {};
-      for (const it of (itemsMonth.data ?? []) as any[]) {
+      for (const it of validItems) {
         const pid = it.product_id ?? "—";
         const prod = productMap.get(pid);
         const cat = (prod?.category ?? "Sem categoria") as string;
@@ -116,15 +144,16 @@ function Dashboard() {
       }
       const productsRanked = Object.values(byProduct).sort((a, b) => b.profit - a.profit);
       const categoriesRanked = Object.entries(byCategory).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.profit - a.profit);
-      // Margem média (por pedido)
-      const perOrderMargins: number[] = (ordersMonth.data ?? []).map((o: any) => {
-        const itemsOfOrder = ((itemsMonth.data ?? []) as any[]).filter((i) => i.order_id === o.id);
+      // Margem média (por pedido) — ignora cancelados e pedidos com total=0
+      const validForMargin = validOrders.filter((o: any) => Number(o.total ?? 0) > 0);
+      const perOrderMargins: number[] = validForMargin.map((o: any) => {
+        const itemsOfOrder = validItems.filter((i) => i.order_id === o.id);
         const cogs = itemsOfOrder.reduce((s, i) => s + Number(i.unit_cost ?? 0) * Number(i.quantity ?? 0), 0);
         const fees = channelFeeAmount(o.channel, Number(o.total ?? 0)) + ((o.payment_method_2 && o.payment_amount_1 != null)
           ? infinityPayFeeAmount(o.channel, o.payment_method, Number(o.payment_amount_1 ?? 0)) + infinityPayFeeAmount(o.channel, o.payment_method_2, Number(o.payment_amount_2 ?? 0))
           : infinityPayFeeAmount(o.channel, o.payment_method, Number(o.total ?? 0)));
         const profit = Number(o.total ?? 0) - cogs - fees;
-        return Number(o.total ?? 0) > 0 ? (profit / Number(o.total)) * 100 : 0;
+        return (profit / Number(o.total)) * 100;
       });
       const avgMarginPct = perOrderMargins.length > 0 ? perOrderMargins.reduce((a, b) => a + b, 0) / perOrderMargins.length : 0;
       // Giro de estoque (por produto) = qty vendida / max(estoque atual, 1)
@@ -135,11 +164,11 @@ function Dashboard() {
       }).sort((a, b) => b.turnover - a.turnover);
 
       return {
-        monthTotal, ordersMonth: ordersMonth.data?.length ?? 0, avgTicket,
+        monthTotal, ordersMonth: validOrders.length, cancelledCount: cancelledOrders.length, avgTicket,
         productsCount: products.count ?? 0, lowStock: low, recent: recent.data ?? [],
-        byChannel, byPayment, byWallet, totalFees, totalChannelFees, totalMachineFees, totalCogs, totalShipping, realProfit, totalExpenses, profitAfterFees,
-        grossRevenue, totalDiscount, grossProfit, cogsPct, feesPct, grossMarginPct, realMarginPct,
-        expensesByCat, ordersList: ordersMonth.data ?? [], itemsList: itemsMonth.data ?? [], expensesList: expensesMonth.data ?? [],
+        byChannel, byPayment, byWallet, byWalletFees, totalFees, totalChannelFees, totalMachineFees, totalCogs, totalShipping, realProfit, totalExpenses, profitAfterFees,
+        grossRevenue, totalDiscount, netProductRevenue, grossProfit, cogsPct, feesPct, grossMarginPct, realMarginPct,
+        expensesByCat, ordersList: validOrders, itemsList: validItems, expensesList: expensesMonth.data ?? [],
         productsRanked, categoriesRanked, turnover, avgMarginPct,
       };
     },
@@ -150,12 +179,12 @@ function Dashboard() {
       { Métrica: "Mês", Valor: label },
       { Métrica: "Receita bruta (produtos)", Valor: data?.grossRevenue ?? 0 },
       { Métrica: "(−) Descontos concedidos", Valor: data?.totalDiscount ?? 0 },
-      { Métrica: "(+) Frete cobrado", Valor: data?.totalShipping ?? 0 },
-      { Métrica: "(=) Receita líquida", Valor: data?.monthTotal ?? 0 },
+      { Métrica: "(=) Receita líquida de produtos", Valor: data?.netProductRevenue ?? 0 },
       { Métrica: "(−) CMV", Valor: data?.totalCogs ?? 0 },
       { Métrica: "CMV %", Valor: `${(data?.cogsPct ?? 0).toFixed(1)}%` },
       { Métrica: "(=) Lucro bruto", Valor: data?.grossProfit ?? 0 },
       { Métrica: "Margem bruta %", Valor: `${(data?.grossMarginPct ?? 0).toFixed(1)}%` },
+      { Métrica: "(+) Frete cobrado", Valor: data?.totalShipping ?? 0 },
       { Métrica: "(−) Comissões plataformas", Valor: data?.totalFees ?? 0 },
       { Métrica: "    ↳ Comissão de canal (Site/Shopee/TikTok)", Valor: data?.totalChannelFees ?? 0 },
       { Métrica: "    ↳ Maquininha Infinity Pay", Valor: data?.totalMachineFees ?? 0 },
@@ -163,7 +192,9 @@ function Dashboard() {
       { Métrica: "(−) Gastos do mês", Valor: data?.totalExpenses ?? 0 },
       { Métrica: "(=) Lucro real", Valor: data?.realProfit ?? 0 },
       { Métrica: "Margem líquida %", Valor: `${(data?.realMarginPct ?? 0).toFixed(1)}%` },
-      { Métrica: "Pedidos", Valor: data?.ordersMonth ?? 0 },
+      { Métrica: "Faturamento (com frete)", Valor: data?.monthTotal ?? 0 },
+      { Métrica: "Pedidos válidos", Valor: data?.ordersMonth ?? 0 },
+      { Métrica: "Pedidos cancelados (excluídos)", Valor: data?.cancelledCount ?? 0 },
       { Métrica: "Ticket médio", Valor: data?.avgTicket ?? 0 },
       { Métrica: "Produtos ativos", Valor: data?.productsCount ?? 0 },
       { Métrica: "Itens com estoque baixo", Valor: data?.lowStock?.length ?? 0 },
@@ -198,24 +229,29 @@ function Dashboard() {
 
   // ---------- Drill openers ----------
   const openRevenue = () => setDrill({
-    label: "Receita líquida", value: brl(data?.monthTotal ?? 0),
-    formula: "Σ orders.total (no mês)\n= Σ (subtotal − discount + shipping)",
-    sources: ["orders.total", "orders.created_at"],
-    description: "Soma dos totais de todos os pedidos faturados no período.",
+    label: "Faturamento (pedidos não cancelados)", value: brl(data?.monthTotal ?? 0),
+    formula: "Σ orders.total WHERE status ≠ 'cancelado'\n= Σ (subtotal − discount + shipping)",
+    sources: ["orders.total", "orders.status", "orders.created_at"],
+    description: `Soma dos totais dos pedidos válidos no período. ${data?.cancelledCount ? `${data?.cancelledCount} pedido(s) cancelado(s) excluído(s).` : ""}`.trim(),
     rows: data?.ordersList, columns: ordersCols,
     breakdown: [
       { label: "Receita bruta", value: brl(data?.grossRevenue ?? 0), hint: "Σ subtotal" },
       { label: "(−) Descontos", value: brl(data?.totalDiscount ?? 0) },
+      { label: "(=) Receita líquida produtos", value: brl(data?.netProductRevenue ?? 0), hint: "base do CMV %" },
       { label: "(+) Frete cobrado", value: brl(data?.totalShipping ?? 0) },
+      { label: "(=) Faturamento total", value: brl(data?.monthTotal ?? 0) },
     ],
   });
   const openCogs = () => setDrill({
     label: "CMV (custo das mercadorias vendidas)", value: brl(data?.totalCogs ?? 0),
-    formula: "Σ order_items.unit_cost × quantity\nCMV % = CMV / Receita líquida × 100",
-    sources: ["order_items.unit_cost", "order_items.quantity"],
+    formula: "Σ order_items.unit_cost × quantity (pedidos não cancelados)\nCMV % = CMV / Receita líquida de produtos × 100",
+    sources: ["order_items.unit_cost", "order_items.quantity", "orders.status"],
     description: "Apenas o custo do produto vendido. Embalagem, brindes e frete subsidiado têm categorias próprias.",
     rows: data?.itemsList, columns: itemsCols,
-    breakdown: [{ label: "CMV %", value: fmtPct(data?.cogsPct ?? 0), hint: "em relação à receita líquida" }],
+    breakdown: [
+      { label: "CMV %", value: fmtPct(data?.cogsPct ?? 0), hint: "sobre receita líquida de produtos" },
+      { label: "Receita líquida produtos", value: brl(data?.netProductRevenue ?? 0) },
+    ],
   });
   const openFees = () => setDrill({
     label: "Taxas de pagamento", value: brl(data?.totalFees ?? 0),
@@ -246,11 +282,13 @@ function Dashboard() {
   });
   const openRealProfit = () => setDrill({
     label: "Lucro líquido (real)", value: brl(data?.realProfit ?? 0),
-    formula: "Receita líquida − CMV − Taxas − Σ Despesas\nMargem líquida = Lucro líquido / Receita líquida × 100",
+    formula: "Receita líquida produtos − CMV\n  + Frete cobrado\n  − Taxas canal − Taxas maquininha\n  − Σ Despesas operacionais\nMargem líquida = Lucro líquido / Faturamento × 100",
     sources: ["orders", "order_items", "expenses"],
     breakdown: [
-      { label: "Receita líquida", value: brl(data?.monthTotal ?? 0) },
+      { label: "Receita líquida produtos", value: brl(data?.netProductRevenue ?? 0) },
       { label: "(−) CMV", value: brl(data?.totalCogs ?? 0) },
+      { label: "(=) Lucro bruto", value: brl(data?.grossProfit ?? 0) },
+      { label: "(+) Frete cobrado", value: brl(data?.totalShipping ?? 0) },
       { label: "(−) Taxas", value: brl(data?.totalFees ?? 0) },
       { label: "(−) Despesas", value: brl(data?.totalExpenses ?? 0) },
       { label: "Margem líquida", value: fmtPct(data?.realMarginPct ?? 0) },
@@ -258,21 +296,21 @@ function Dashboard() {
   });
   const openGrossProfit = () => setDrill({
     label: "Lucro bruto", value: brl(data?.grossProfit ?? 0),
-    formula: "Receita líquida − CMV\nMargem bruta = Lucro bruto / Receita líquida × 100",
-    sources: ["orders.total", "order_items.unit_cost"],
+    formula: "Receita líquida produtos − CMV\nMargem bruta = Lucro bruto / Receita líquida produtos × 100",
+    sources: ["orders.subtotal", "orders.discount", "order_items.unit_cost"],
     breakdown: [
-      { label: "Receita líquida", value: brl(data?.monthTotal ?? 0) },
+      { label: "Receita líquida produtos", value: brl(data?.netProductRevenue ?? 0) },
       { label: "(−) CMV", value: brl(data?.totalCogs ?? 0) },
       { label: "Margem bruta", value: fmtPct(data?.grossMarginPct ?? 0) },
     ],
   });
   const openTicket = () => setDrill({
     label: "Ticket médio", value: brl(data?.avgTicket ?? 0),
-    formula: "Receita líquida / nº pedidos",
-    sources: ["orders.total", "COUNT(orders)"],
+    formula: "Faturamento / nº pedidos válidos (não cancelados)",
+    sources: ["orders.total", "orders.status"],
     rows: data?.ordersList, columns: ordersCols,
     breakdown: [
-      { label: "Receita líquida", value: brl(data?.monthTotal ?? 0) },
+      { label: "Faturamento", value: brl(data?.monthTotal ?? 0) },
       { label: "Pedidos", value: String(data?.ordersMonth ?? 0) },
     ],
   });
@@ -299,11 +337,18 @@ function Dashboard() {
       }
       return walletFor(o.channel, o.payment_method) === w;
     });
+    const bruto = Number(data?.byWallet?.[w as WalletType] ?? 0);
+    const taxas = Number(data?.byWalletFees?.[w as WalletType] ?? 0);
     setDrill({
-      label: `Carteira — ${w}`, value: brl(data?.byWallet?.[w as WalletType] ?? 0),
-      formula: "Σ valor recebido pelos pedidos cujo método cai nesta carteira",
+      label: `Carteira — ${w}`, value: brl(bruto - taxas),
+      formula: "Bruto recebido − (taxa de canal + taxa de maquininha) atribuída à carteira\nDescrição: valor que efetivamente cai (líquido) descontando taxas.",
       sources: ["orders.channel", "orders.payment_method"],
       rows, columns: ordersCols,
+      breakdown: [
+        { label: "Bruto recebido", value: brl(bruto) },
+        { label: "(−) Taxas", value: brl(taxas) },
+        { label: "(=) Líquido", value: brl(bruto - taxas) },
+      ],
     });
   };
   const openTopProducts = (mode: "top" | "bottom") => {
@@ -381,10 +426,10 @@ function Dashboard() {
           {([
             { label: "Receita bruta (produtos)", value: data?.grossRevenue ?? 0, sign: "+", onClick: openRevenue },
             { label: "Descontos concedidos", value: -(data?.totalDiscount ?? 0), sign: "−", onClick: openRevenue },
-            { label: "Frete cobrado", value: data?.totalShipping ?? 0, sign: "+", onClick: openRevenue },
-            { label: "Receita líquida", value: data?.monthTotal ?? 0, total: true, onClick: openRevenue },
+            { label: "Receita líquida de produtos", value: data?.netProductRevenue ?? 0, total: true, onClick: openRevenue },
             { label: `CMV (${(data?.cogsPct ?? 0).toFixed(1)}%) — apenas custo do produto`, value: -(data?.totalCogs ?? 0), sign: "−", onClick: openCogs },
             { label: `Lucro bruto (${(data?.grossMarginPct ?? 0).toFixed(1)}%)`, value: data?.grossProfit ?? 0, total: true, onClick: openGrossProfit },
+            { label: "Frete cobrado", value: data?.totalShipping ?? 0, sign: "+", onClick: openRevenue },
             { label: "Taxas de canal (Site 4% · Shopee 22% · TikTok 12%)", value: -(data?.totalChannelFees ?? 0), sign: "−", onClick: openFees },
             { label: "Taxas de maquininha Infinity Pay (Déb 1,49% · Créd 4,29%)", value: -(data?.totalMachineFees ?? 0), sign: "−", onClick: openFees },
             { label: "Embalagem (sacola, papel seda, adesivo, caixa)", value: -(data?.expensesByCat?.["Embalagem"] ?? 0), sign: "−", onClick: () => openExpenseCat("Embalagem") },
@@ -411,7 +456,7 @@ function Dashboard() {
           ))}
         </div>
         <p className="text-[11px] text-muted-foreground mt-3">
-          CMV usa apenas o custo do produto vendido. Embalagem, brindes, frete subsidiado, marketing e operacional têm categorias próprias e vêm de Gastos. Taxas de canal (Site/Shopee/TikTok) e Infinity Pay (presencial) são calculadas em cima de cada pedido.
+          Pedidos cancelados ({data?.cancelledCount ?? 0}) NÃO entram em nenhum cálculo financeiro. CMV % é calculado sobre a Receita líquida de produtos (sem frete). Frete cobrado entra abaixo do lucro bruto, junto às demais entradas/saídas operacionais. Embalagem, brindes, frete subsidiado, marketing e operacional vêm de Gastos.
         </p>
       </Card>
 
@@ -423,7 +468,9 @@ function Dashboard() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {WALLETS.map((w) => {
-            const val = data?.byWallet?.[w] ?? 0;
+            const bruto = data?.byWallet?.[w] ?? 0;
+            const taxas = data?.byWalletFees?.[w] ?? 0;
+            const liquido = bruto - taxas;
             const hint = w === "Papel" ? "Dinheiro físico"
               : w === "Mercado Pago" ? "Site · Shopee · TikTok"
               : w === "Infinity Pay" ? "Pix/Cartão presencial"
@@ -431,12 +478,14 @@ function Dashboard() {
             return (
               <button key={w} type="button" onClick={() => openWallet(w)} className="text-left rounded-lg border border-border bg-muted/30 p-4 transition hover:bg-muted hover:shadow">
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">{w}</div>
-                <div className="text-2xl font-bold mt-1">{brl(val)}</div>
+                <div className="text-2xl font-bold mt-1">{brl(liquido)}</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">Bruto {brl(bruto)} · Taxas {brl(taxas)}</div>
                 <div className="text-[11px] text-muted-foreground mt-1">{hint}</div>
               </button>
             );
           })}
         </div>
+        <p className="text-[11px] text-muted-foreground mt-3">Valor em destaque = líquido (já desconta comissão de canal e taxa da maquininha). Bruto = entrou na carteira; Taxas = quanto saiu para Site/Shopee/TikTok/Infinity Pay.</p>
       </Card>
 
       <Card className="p-5 shadow-card mb-6">
