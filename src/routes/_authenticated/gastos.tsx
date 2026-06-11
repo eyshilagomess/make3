@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Download, Receipt, Pencil, Upload, Sparkles, Image as ImageIcon } from "lucide-react";
+import { Plus, Trash2, Download, Receipt, Pencil, Upload, Sparkles, Image as ImageIcon, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { brl } from "@/lib/format";
 import { downloadXLSX } from "@/lib/export";
@@ -20,17 +20,26 @@ import { extractFromImage } from "@/lib/extract-invoice.functions";
 import { EXPENSE_CATEGORIES } from "@/lib/finance";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { rangeFromPreset, DEFAULT_PRESET, toDateStr, type DateRange } from "@/lib/date-range";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated/gastos")({
   head: () => ({ meta: [{ title: "Gastos — Make 3" }] }),
   component: Page,
 });
 
-const CATEGORIES = EXPENSE_CATEGORIES;
+const EXPENSE_CATS = EXPENSE_CATEGORIES;
+const INCOME_CATS = ["Repasse Shopee", "Repasse TikTok", "Repasse Site", "Recebimento Infinity Pay", "Outros recebimentos"] as const;
 
-type Form = { category: string; amount: string; expense_date: string; notes: string; photo_url: string };
+type Kind = "saida" | "entrada";
+type Status = "confirmado" | "pendente";
+type Form = { kind: Kind; status: Status; category: string; amount: string; expense_date: string; notes: string; photo_url: string };
 const today = () => new Date().toISOString().slice(0, 10);
-const empty = (): Form => ({ category: CATEGORIES[0], amount: "", expense_date: today(), notes: "", photo_url: "" });
+const empty = (kind: Kind = "saida"): Form => ({
+  kind, status: "confirmado",
+  category: kind === "saida" ? EXPENSE_CATS[0] : INCOME_CATS[0],
+  amount: "", expense_date: today(), notes: "", photo_url: "",
+});
 
 async function fileToBase64(file: File): Promise<string> {
   const buf = await file.arrayBuffer();
@@ -42,6 +51,7 @@ async function fileToBase64(file: File): Promise<string> {
 function Page() {
   const qc = useQueryClient();
   const [range, setRange] = useState<DateRange>(() => rangeFromPreset(DEFAULT_PRESET));
+  const [kindFilter, setKindFilter] = useState<"todos" | Kind>("todos");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -69,6 +79,8 @@ function Page() {
         expense_date: f.expense_date,
         notes: f.notes || null,
         photo_url: f.photo_url || null,
+        kind: f.kind,
+        status: f.status,
       };
       if (editingId) {
         const { error } = await (supabase as any).from("expenses").update(payload).eq("id", editingId);
@@ -81,7 +93,9 @@ function Page() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["expenses"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success(editingId ? "Gasto atualizado" : "Gasto registrado!");
+      qc.invalidateQueries({ queryKey: ["fechamento-payments"] });
+      qc.invalidateQueries({ queryKey: ["fechamento-summary"] });
+      toast.success(editingId ? "Lançamento atualizado" : "Lançamento registrado!");
       setOpen(false); setEditingId(null); setForm(empty());
     },
     onError: (e: any) => toast.error(e.message),
@@ -113,7 +127,7 @@ function Page() {
           const result: any = await extract({ data: { imageBase64: b64, mimeType: file.type || "image/jpeg", kind: "receipt" } });
           setForm((f) => ({
             ...f,
-            category: CATEGORIES.includes(result.category) ? result.category : f.category,
+            category: (EXPENSE_CATS as readonly string[]).includes(result.category) ? result.category : f.category,
             amount: result.amount ? String(result.amount) : f.amount,
             expense_date: result.expense_date || f.expense_date,
             notes: result.notes || f.notes,
@@ -129,13 +143,15 @@ function Page() {
   const openEdit = (r: any) => {
     setEditingId(r.id);
     setForm({
+      kind: (r.kind as Kind) ?? "saida",
+      status: (r.status as Status) ?? "confirmado",
       category: r.category, amount: String(r.amount ?? 0),
       expense_date: r.expense_date, notes: r.notes ?? "",
       photo_url: r.photo_url ?? "",
     });
     setOpen(true);
   };
-  const openNew = () => { setEditingId(null); setForm(empty()); setOpen(true); };
+  const openNew = (kind: Kind = "saida") => { setEditingId(null); setForm(empty(kind)); setOpen(true); };
 
   const openPhoto = async (path: string) => {
     const { data, error } = await supabase.storage.from("expense-receipts").createSignedUrl(path, 60);
@@ -143,30 +159,67 @@ function Page() {
     window.open(data.signedUrl, "_blank");
   };
 
-  const rows: any[] = data ?? [];
+  const allRows: any[] = data ?? [];
+  const rows = kindFilter === "todos" ? allRows : allRows.filter(r => (r.kind ?? "saida") === kindFilter);
+  const totalSaida = allRows.filter(r => (r.kind ?? "saida") === "saida").reduce((s, r) => s + Number(r.amount ?? 0), 0);
+  const totalEntrada = allRows.filter(r => r.kind === "entrada").reduce((s, r) => s + Number(r.amount ?? 0), 0);
+  const saldo = totalEntrada - totalSaida;
   const total = rows.reduce((s, r) => s + Number(r.amount ?? 0), 0);
   const byCategory = rows.reduce<Record<string, number>>((acc, r) => { acc[r.category] = (acc[r.category] || 0) + Number(r.amount ?? 0); return acc; }, {});
 
   const exportXLSX = () => {
-    const detalhes = rows.map(r => ({ Data: r.expense_date, Categoria: r.category, Valor: Number(r.amount), Observação: r.notes ?? "", "Tem recibo": r.photo_url ? "sim" : "não" }));
+    const detalhes = rows.map(r => ({ Data: r.expense_date, Tipo: r.kind === "entrada" ? "Entrada" : "Saída", Categoria: r.category, Valor: Number(r.amount), Status: r.status ?? "confirmado", Observação: r.notes ?? "", "Tem recibo": r.photo_url ? "sim" : "não" }));
     const resumo = Object.entries(byCategory).map(([Categoria, Total]) => ({ Categoria, Total }));
-    downloadXLSX(`gastos-${start}_${end}.xlsx`, { Resumo: resumo, Detalhes: detalhes });
+    downloadXLSX(`lancamentos-${start}_${end}.xlsx`, { Resumo: resumo, Detalhes: detalhes });
   };
+
+  const catOptions = form.kind === "entrada" ? INCOME_CATS : EXPENSE_CATS;
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
       <PageHeader
-        title="Gastos"
-        subtitle={`Despesas — ${label}`}
+        title="Gastos & Recebimentos"
+        subtitle={`Entradas e saídas — ${label}`}
         actions={
           <div className="flex items-center gap-2">
             <DateRangeFilter value={range} onChange={setRange} />
+            <Select value={kindFilter} onValueChange={(v: any) => setKindFilter(v)}>
+              <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="saida">Saídas</SelectItem>
+                <SelectItem value="entrada">Entradas</SelectItem>
+              </SelectContent>
+            </Select>
             <Button variant="outline" onClick={exportXLSX}><Download className="h-4 w-4 mr-1" /> Baixar</Button>
-            <Button className="bg-gradient-brand text-primary-foreground border-0 shadow-glow" onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo gasto</Button>
+            <Button variant="outline" onClick={() => openNew("entrada")}><ArrowDownCircle className="h-4 w-4 mr-1" /> Entrada</Button>
+            <Button className="bg-gradient-brand text-primary-foreground border-0 shadow-glow" onClick={() => openNew("saida")}><Plus className="h-4 w-4 mr-1" /> Saída</Button>
             <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditingId(null); setForm(empty()); } }}>
               <DialogContent className="max-w-md">
-                <DialogHeader><DialogTitle>{editingId ? "Editar gasto" : "Registrar gasto"}</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>{editingId ? "Editar lançamento" : (form.kind === "entrada" ? "Registrar entrada" : "Registrar saída")}</DialogTitle></DialogHeader>
                 <form onSubmit={(e) => { e.preventDefault(); save.mutate(form); }} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Tipo *</Label>
+                      <Select value={form.kind} onValueChange={(v: any) => setForm({ ...form, kind: v, category: v === "entrada" ? INCOME_CATS[0] : EXPENSE_CATS[0] })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="saida">Saída (gasto)</SelectItem>
+                          <SelectItem value="entrada">Entrada (recebimento)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Status *</Label>
+                      <Select value={form.status} onValueChange={(v: any) => setForm({ ...form, status: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="confirmado">Confirmado</SelectItem>
+                          <SelectItem value="pendente">Pendente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                   <div className="space-y-1.5">
                     <Label>Recibo / cupom (opcional)</Label>
                     <div className="flex items-center gap-2">
@@ -184,7 +237,7 @@ function Page() {
                   <div className="space-y-1.5">
                     <Label>Categoria *</Label>
                     <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      {catOptions.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -204,10 +257,10 @@ function Page() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        <StatCard accent label="Total do mês" value={brl(total)} icon={Receipt} hint={`${rows.length} lançamentos`} />
-        {Object.entries(byCategory).slice(0, 3).map(([cat, val]) => (
-          <StatCard key={cat} label={cat} value={brl(val)} hint={`${((val / (total || 1)) * 100).toFixed(0)}% do total`} />
-        ))}
+        <StatCard accent label="Saídas" value={brl(totalSaida)} icon={ArrowUpCircle} hint={`${allRows.filter(r => (r.kind ?? "saida") === "saida").length} lançamentos`} />
+        <StatCard label="Entradas" value={brl(totalEntrada)} icon={ArrowDownCircle} hint={`${allRows.filter(r => r.kind === "entrada").length} lançamentos`} />
+        <StatCard label="Saldo do período" value={brl(saldo)} hint={saldo >= 0 ? "Positivo" : "Negativo"} />
+        <StatCard label="Filtro atual" value={brl(total)} icon={Receipt} hint={`${rows.length} registros`} />
       </div>
 
       <Card className="p-4 shadow-card">
@@ -215,22 +268,32 @@ function Page() {
           <TableHeader>
             <TableRow>
               <TableHead>Data</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead>Observação</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Recibo</TableHead>
               <TableHead className="text-right">Valor</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">Nenhum gasto neste mês.</TableCell></TableRow>}
+            {rows.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Nenhum lançamento no período.</TableCell></TableRow>}
             {rows.map((r) => (
               <TableRow key={r.id}>
                 <TableCell className="whitespace-nowrap">{new Date(r.expense_date + "T00:00:00").toLocaleDateString("pt-BR")}</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className={r.kind === "entrada" ? "bg-success/10 text-success border-success/30" : "bg-warning/10 text-warning border-warning/30"}>
+                    {r.kind === "entrada" ? "Entrada" : "Saída"}
+                  </Badge>
+                </TableCell>
                 <TableCell className="font-medium">{r.category}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">{r.notes ?? "—"}</TableCell>
+                <TableCell><Badge variant="outline" className="text-xs">{(r.status ?? "confirmado") === "pendente" ? "Pendente" : "Confirmado"}</Badge></TableCell>
                 <TableCell>{r.photo_url ? <Button size="sm" variant="ghost" onClick={() => openPhoto(r.photo_url)}><ImageIcon className="h-4 w-4" /></Button> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
-                <TableCell className="text-right tabular-nums font-semibold">{brl(Number(r.amount))}</TableCell>
+                <TableCell className={`text-right tabular-nums font-semibold ${r.kind === "entrada" ? "text-success" : ""}`}>
+                  {r.kind === "entrada" ? "+" : "−"}{brl(Number(r.amount))}
+                </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
