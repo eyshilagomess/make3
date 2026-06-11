@@ -43,7 +43,7 @@ function Dashboard() {
         supabase.from("products").select("id,name,stock,min_stock,category,cost,price").eq("status", "ativo"),
         supabase.from("products").select("id", { count: "exact", head: true }),
         supabase.from("order_items").select("order_id,product_id,product_name,quantity,unit_price,unit_cost,subtotal,orders!inner(id,order_code,channel,created_at)").gte("orders.created_at", start).lt("orders.created_at", end),
-        (supabase as any).from("expenses").select("amount,category").gte("expense_date", startDate).lt("expense_date", endDate),
+        (supabase as any).from("expenses").select("amount,category").eq("kind", "saida").gte("expense_date", startDate).lt("expense_date", endDate),
       ]);
 
       // Fonte da verdade: pedidos NÃO cancelados. Pedidos cancelados não entram em nenhum cálculo financeiro.
