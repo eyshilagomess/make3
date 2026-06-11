@@ -44,51 +44,6 @@ export type Database = {
         }
         Relationships: []
       }
-      closing_payments: {
-        Row: {
-          amount: number
-          created_at: string
-          created_by: string | null
-          description: string
-          id: string
-          kind: string
-          notes: string | null
-          paid_at: string
-          period_end: string
-          period_start: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          amount?: number
-          created_at?: string
-          created_by?: string | null
-          description: string
-          id?: string
-          kind: string
-          notes?: string | null
-          paid_at?: string
-          period_end: string
-          period_start: string
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          created_by?: string | null
-          description?: string
-          id?: string
-          kind?: string
-          notes?: string | null
-          paid_at?: string
-          period_end?: string
-          period_start?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       customers: {
         Row: {
           address: string | null
@@ -214,8 +169,10 @@ export type Database = {
           created_by: string | null
           expense_date: string
           id: string
+          kind: string
           notes: string | null
           photo_url: string | null
+          status: string
           updated_at: string
         }
         Insert: {
@@ -225,8 +182,10 @@ export type Database = {
           created_by?: string | null
           expense_date?: string
           id?: string
+          kind?: string
           notes?: string | null
           photo_url?: string | null
+          status?: string
           updated_at?: string
         }
         Update: {
@@ -236,8 +195,10 @@ export type Database = {
           created_by?: string | null
           expense_date?: string
           id?: string
+          kind?: string
           notes?: string | null
           photo_url?: string | null
+          status?: string
           updated_at?: string
         }
         Relationships: []
