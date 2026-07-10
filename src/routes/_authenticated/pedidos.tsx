@@ -22,6 +22,8 @@ import {
 } from "@/lib/format";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { rangeFromPreset, DEFAULT_PRESET, toISO, endExclusiveISO, type DateRange } from "@/lib/date-range";
+import { useServerFn } from "@tanstack/react-start";
+import { notifyOrderEvent } from "@/lib/order-notify.functions";
 
 export const Route = createFileRoute("/_authenticated/pedidos")({
   head: () => ({ meta: [{ title: "Pedidos — Make 3" }] }),
