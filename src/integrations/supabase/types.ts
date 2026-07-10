@@ -277,17 +277,27 @@ export type Database = {
           customer_name_freeform: string | null
           discount: number
           external_reference: string | null
+          guest_email: string | null
+          guest_name: string | null
+          guest_phone: string | null
           id: string
           notes: string | null
           order_code: string
           payment_amount_1: number | null
           payment_amount_2: number | null
+          payment_link: string | null
           payment_method: Database["public"]["Enums"]["payment_method"] | null
           payment_method_2: Database["public"]["Enums"]["payment_method"] | null
           payment_proof_url: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
           seller_id: string | null
           shipping: number
+          shipping_address: Json | null
+          shipping_carrier: string | null
+          shipping_cep: string | null
+          shipping_deadline_days: number | null
+          shipping_service: string | null
+          source: string
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
           total: number
@@ -302,11 +312,15 @@ export type Database = {
           customer_name_freeform?: string | null
           discount?: number
           external_reference?: string | null
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
           id?: string
           notes?: string | null
           order_code?: string
           payment_amount_1?: number | null
           payment_amount_2?: number | null
+          payment_link?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           payment_method_2?:
             | Database["public"]["Enums"]["payment_method"]
@@ -315,6 +329,12 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["payment_status"]
           seller_id?: string | null
           shipping?: number
+          shipping_address?: Json | null
+          shipping_carrier?: string | null
+          shipping_cep?: string | null
+          shipping_deadline_days?: number | null
+          shipping_service?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           total?: number
@@ -329,11 +349,15 @@ export type Database = {
           customer_name_freeform?: string | null
           discount?: number
           external_reference?: string | null
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
           id?: string
           notes?: string | null
           order_code?: string
           payment_amount_1?: number | null
           payment_amount_2?: number | null
+          payment_link?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           payment_method_2?:
             | Database["public"]["Enums"]["payment_method"]
@@ -342,6 +366,12 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["payment_status"]
           seller_id?: string | null
           shipping?: number
+          shipping_address?: Json | null
+          shipping_carrier?: string | null
+          shipping_cep?: string | null
+          shipping_deadline_days?: number | null
+          shipping_service?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           total?: number
@@ -453,7 +483,9 @@ export type Database = {
           created_by: string | null
           description: string | null
           has_variants: boolean
+          height_cm: number
           id: string
+          length_cm: number
           min_stock: number
           name: string
           other_costs: number
@@ -469,6 +501,8 @@ export type Database = {
           supplier_id: string | null
           target_margin: number
           updated_at: string
+          weight_g: number
+          width_cm: number
         }
         Insert: {
           avg_cost?: number
@@ -479,7 +513,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           has_variants?: boolean
+          height_cm?: number
           id?: string
+          length_cm?: number
           min_stock?: number
           name: string
           other_costs?: number
@@ -495,6 +531,8 @@ export type Database = {
           supplier_id?: string | null
           target_margin?: number
           updated_at?: string
+          weight_g?: number
+          width_cm?: number
         }
         Update: {
           avg_cost?: number
@@ -505,7 +543,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           has_variants?: boolean
+          height_cm?: number
           id?: string
+          length_cm?: number
           min_stock?: number
           name?: string
           other_costs?: number
@@ -521,6 +561,8 @@ export type Database = {
           supplier_id?: string | null
           target_margin?: number
           updated_at?: string
+          weight_g?: number
+          width_cm?: number
         }
         Relationships: [
           {
@@ -609,6 +651,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      store_settings: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
       }
       suppliers: {
         Row: {
