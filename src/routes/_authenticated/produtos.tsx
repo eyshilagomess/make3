@@ -33,12 +33,14 @@ type Form = {
   stock: string; min_stock: string;
   has_variants: boolean;
   price_site: string; price_shopee: string; price_tiktok: string;
+  margin_site: string; margin_shopee: string; margin_tiktok: string;
 };
 const empty: Form = {
   name: "", sku: "", category: "", brand: "", supplier_id: "", photo_url: "",
   cost: "0", packaging_cost: "0", other_costs: "0", target_margin: "30",
   stock: "0", min_stock: "0", has_variants: false,
   price_site: "", price_shopee: "", price_tiktok: "",
+  margin_site: "30", margin_shopee: "30", margin_tiktok: "30",
 };
 
 function Page() {
@@ -333,6 +335,12 @@ function Page() {
   });
 
   const openEdit = (p: any) => {
+    const c = Number(p.cost || 0), pk = Number(p.packaging_cost || 0), o = Number(p.other_costs || 0);
+    const fallbackMargin = String(p.target_margin ?? 0);
+    const marginFor = (price: any, ch: Channel) => {
+      const m = price != null ? marginFromPrice(Number(price), c, pk, o, ch) : null;
+      return m != null ? String(m) : fallbackMargin;
+    };
     setForm({
       name: p.name ?? "", sku: p.sku ?? "", category: p.category ?? "", brand: p.brand ?? "",
       supplier_id: p.supplier_id ?? "", photo_url: p.photo_url ?? "",
@@ -343,6 +351,9 @@ function Page() {
       price_site: p.price_site != null ? String(p.price_site) : "",
       price_shopee: p.price_shopee != null ? String(p.price_shopee) : "",
       price_tiktok: p.price_tiktok != null ? String(p.price_tiktok) : "",
+      margin_site: marginFor(p.price_site, "site"),
+      margin_shopee: marginFor(p.price_shopee, "shopee"),
+      margin_tiktok: marginFor(p.price_tiktok, "tiktok"),
     });
     setEditingId(p.id);
   };
@@ -489,7 +500,7 @@ function Page() {
                   <TableCell className="font-mono text-xs">{p.sku ?? "—"}</TableCell>
                   <TableCell className="text-right text-sm tabular-nums">
                     <div className="font-medium">{brl(ct)}</div>
-                    <div className="text-[10px] text-muted-foreground">alvo {Number(p.target_margin ?? 0)}%</div>
+                    <div className="text-[10px] text-muted-foreground">padrão {Number(p.target_margin ?? 0)}%</div>
                   </TableCell>
                   <TableCell>{cell(p.price_site, "site")}</TableCell>
                   <TableCell>{cell(p.price_shopee, "shopee")}</TableCell>
