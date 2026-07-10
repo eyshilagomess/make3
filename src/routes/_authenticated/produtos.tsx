@@ -15,7 +15,7 @@ import { Plus, Search, Layers, Trash2, Upload, Download, Pencil, Check, X, FileT
 import { History, ImageIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { brl } from "@/lib/format";
+import { brl, dateBR } from "@/lib/format";
 import { calcAllPrices, calcPrice, marginFromPrice, CHANNEL_FEES, CHANNEL_LABEL, totalCost, type Channel } from "@/lib/pricing";
 import * as XLSX from "xlsx";
 import { useServerFn } from "@tanstack/react-start";
