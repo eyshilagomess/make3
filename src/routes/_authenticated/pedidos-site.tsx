@@ -11,7 +11,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { notifyOrderEvent } from "@/lib/order-notify.functions";
-import { formatBRL } from "@/lib/format";
+import { brl as formatBRL } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/pedidos-site")({
   component: PedidosSite,
@@ -65,7 +65,7 @@ function PedidosSite() {
     <div className="p-4 md:p-6 space-y-4">
       <PageHeader
         title="Pedidos Site"
-        description="Pedidos do e-commerce Make 3 — ligados ao estoque e à conta Infinity Pay."
+        subtitle="Pedidos do e-commerce Make 3 — ligados ao estoque e à conta Infinity Pay."
       />
       <div className="grid gap-3">
         {(orders ?? []).length === 0 && (
