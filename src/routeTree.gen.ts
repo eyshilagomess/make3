@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedVendasRouteImport } from './routes/_authenticated/vendas'
 import { Route as AuthenticatedProdutosRouteImport } from './routes/_authenticated/produtos'
+import { Route as AuthenticatedPedidosSiteRouteImport } from './routes/_authenticated/pedidos-site'
 import { Route as AuthenticatedPedidosRouteImport } from './routes/_authenticated/pedidos'
 import { Route as AuthenticatedGastosRouteImport } from './routes/_authenticated/gastos'
 import { Route as AuthenticatedFornecedoresRouteImport } from './routes/_authenticated/fornecedores'
@@ -53,6 +54,12 @@ const AuthenticatedProdutosRoute = AuthenticatedProdutosRouteImport.update({
   path: '/produtos',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedPedidosSiteRoute =
+  AuthenticatedPedidosSiteRouteImport.update({
+    id: '/pedidos-site',
+    path: '/pedidos-site',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedPedidosRoute = AuthenticatedPedidosRouteImport.update({
   id: '/pedidos',
   path: '/pedidos',
@@ -140,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/gastos': typeof AuthenticatedGastosRoute
   '/pedidos': typeof AuthenticatedPedidosRoute
+  '/pedidos-site': typeof AuthenticatedPedidosSiteRoute
   '/produtos': typeof AuthenticatedProdutosRoute
   '/vendas': typeof AuthenticatedVendasRoute
   '/api/public/coupons/validate': typeof ApiPublicCouponsValidateRoute
@@ -160,6 +168,7 @@ export interface FileRoutesByTo {
   '/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/gastos': typeof AuthenticatedGastosRoute
   '/pedidos': typeof AuthenticatedPedidosRoute
+  '/pedidos-site': typeof AuthenticatedPedidosSiteRoute
   '/produtos': typeof AuthenticatedProdutosRoute
   '/vendas': typeof AuthenticatedVendasRoute
   '/api/public/coupons/validate': typeof ApiPublicCouponsValidateRoute
@@ -182,6 +191,7 @@ export interface FileRoutesById {
   '/_authenticated/fornecedores': typeof AuthenticatedFornecedoresRoute
   '/_authenticated/gastos': typeof AuthenticatedGastosRoute
   '/_authenticated/pedidos': typeof AuthenticatedPedidosRoute
+  '/_authenticated/pedidos-site': typeof AuthenticatedPedidosSiteRoute
   '/_authenticated/produtos': typeof AuthenticatedProdutosRoute
   '/_authenticated/vendas': typeof AuthenticatedVendasRoute
   '/api/public/coupons/validate': typeof ApiPublicCouponsValidateRoute
@@ -204,6 +214,7 @@ export interface FileRouteTypes {
     | '/fornecedores'
     | '/gastos'
     | '/pedidos'
+    | '/pedidos-site'
     | '/produtos'
     | '/vendas'
     | '/api/public/coupons/validate'
@@ -224,6 +235,7 @@ export interface FileRouteTypes {
     | '/fornecedores'
     | '/gastos'
     | '/pedidos'
+    | '/pedidos-site'
     | '/produtos'
     | '/vendas'
     | '/api/public/coupons/validate'
@@ -245,6 +257,7 @@ export interface FileRouteTypes {
     | '/_authenticated/fornecedores'
     | '/_authenticated/gastos'
     | '/_authenticated/pedidos'
+    | '/_authenticated/pedidos-site'
     | '/_authenticated/produtos'
     | '/_authenticated/vendas'
     | '/api/public/coupons/validate'
@@ -300,6 +313,13 @@ declare module '@tanstack/react-router' {
       path: '/produtos'
       fullPath: '/produtos'
       preLoaderRoute: typeof AuthenticatedProdutosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/pedidos-site': {
+      id: '/_authenticated/pedidos-site'
+      path: '/pedidos-site'
+      fullPath: '/pedidos-site'
+      preLoaderRoute: typeof AuthenticatedPedidosSiteRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/pedidos': {
@@ -413,6 +433,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedFornecedoresRoute: typeof AuthenticatedFornecedoresRoute
   AuthenticatedGastosRoute: typeof AuthenticatedGastosRoute
   AuthenticatedPedidosRoute: typeof AuthenticatedPedidosRoute
+  AuthenticatedPedidosSiteRoute: typeof AuthenticatedPedidosSiteRoute
   AuthenticatedProdutosRoute: typeof AuthenticatedProdutosRoute
   AuthenticatedVendasRoute: typeof AuthenticatedVendasRoute
 }
@@ -427,6 +448,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedFornecedoresRoute: AuthenticatedFornecedoresRoute,
   AuthenticatedGastosRoute: AuthenticatedGastosRoute,
   AuthenticatedPedidosRoute: AuthenticatedPedidosRoute,
+  AuthenticatedPedidosSiteRoute: AuthenticatedPedidosSiteRoute,
   AuthenticatedProdutosRoute: AuthenticatedProdutosRoute,
   AuthenticatedVendasRoute: AuthenticatedVendasRoute,
 }
