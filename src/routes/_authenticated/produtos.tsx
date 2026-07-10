@@ -109,7 +109,7 @@ function Page() {
   const bulkApply = async () => {
     if (selected.size === 0) return;
     const chosen = (["site", "shopee", "tiktok"] as Channel[]).filter((c) => (bulkChannels as any)[c]);
-    if (bulkOn.markup && chosen.length === 0) { toast.error("Escolha ao menos um canal para o markup"); return; }
+    if (bulkOn.markup && chosen.length === 0) { toast.error("Escolha ao menos um canal para a margem"); return; }
     const anything = Object.values(bulkOn).some(Boolean);
     if (!anything) { toast.error("Marque ao menos um campo para alterar"); return; }
     setBulkBusy(true);
