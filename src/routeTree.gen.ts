@@ -26,6 +26,7 @@ import { Route as ApiPublicShippingCalculateRouteImport } from './routes/api/pub
 import { Route as ApiPublicProductsListRouteImport } from './routes/api/public/products/list'
 import { Route as ApiPublicOrdersCreateRouteImport } from './routes/api/public/orders/create'
 import { Route as ApiPublicInfinitypayWebhookRouteImport } from './routes/api/public/infinitypay/webhook'
+import { Route as ApiPublicCouponsValidateRouteImport } from './routes/api/public/coupons/validate'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -114,6 +115,12 @@ const ApiPublicInfinitypayWebhookRoute =
     path: '/api/public/infinitypay/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCouponsValidateRoute =
+  ApiPublicCouponsValidateRouteImport.update({
+    id: '/api/public/coupons/validate',
+    path: '/api/public/coupons/validate',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/produtos': typeof AuthenticatedProdutosRoute
   '/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/coupons/validate': typeof ApiPublicCouponsValidateRoute
   '/api/public/infinitypay/webhook': typeof ApiPublicInfinitypayWebhookRoute
   '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
@@ -146,6 +154,7 @@ export interface FileRoutesByTo {
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/produtos': typeof AuthenticatedProdutosRoute
   '/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/coupons/validate': typeof ApiPublicCouponsValidateRoute
   '/api/public/infinitypay/webhook': typeof ApiPublicInfinitypayWebhookRoute
   '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
@@ -166,6 +175,7 @@ export interface FileRoutesById {
   '/_authenticated/pedidos': typeof AuthenticatedPedidosRoute
   '/_authenticated/produtos': typeof AuthenticatedProdutosRoute
   '/_authenticated/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/coupons/validate': typeof ApiPublicCouponsValidateRoute
   '/api/public/infinitypay/webhook': typeof ApiPublicInfinitypayWebhookRoute
   '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/produtos'
     | '/vendas'
+    | '/api/public/coupons/validate'
     | '/api/public/infinitypay/webhook'
     | '/api/public/orders/create'
     | '/api/public/products/list'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/produtos'
     | '/vendas'
+    | '/api/public/coupons/validate'
     | '/api/public/infinitypay/webhook'
     | '/api/public/orders/create'
     | '/api/public/products/list'
@@ -223,6 +235,7 @@ export interface FileRouteTypes {
     | '/_authenticated/pedidos'
     | '/_authenticated/produtos'
     | '/_authenticated/vendas'
+    | '/api/public/coupons/validate'
     | '/api/public/infinitypay/webhook'
     | '/api/public/orders/create'
     | '/api/public/products/list'
@@ -233,6 +246,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicCouponsValidateRoute: typeof ApiPublicCouponsValidateRoute
   ApiPublicInfinitypayWebhookRoute: typeof ApiPublicInfinitypayWebhookRoute
   ApiPublicOrdersCreateRoute: typeof ApiPublicOrdersCreateRoute
   ApiPublicProductsListRoute: typeof ApiPublicProductsListRoute
@@ -360,6 +374,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInfinitypayWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/coupons/validate': {
+      id: '/api/public/coupons/validate'
+      path: '/api/public/coupons/validate'
+      fullPath: '/api/public/coupons/validate'
+      preLoaderRoute: typeof ApiPublicCouponsValidateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -397,6 +418,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicCouponsValidateRoute: ApiPublicCouponsValidateRoute,
   ApiPublicInfinitypayWebhookRoute: ApiPublicInfinitypayWebhookRoute,
   ApiPublicOrdersCreateRoute: ApiPublicOrdersCreateRoute,
   ApiPublicProductsListRoute: ApiPublicProductsListRoute,
