@@ -69,25 +69,34 @@ export const Route = createFileRoute("/api/public/products/list")({
           varsByProduct.set(v.product_id, arr);
         }
 
-        const out = (products ?? []).map((p) => ({
-          id: p.id,
-          name: p.name,
-          sku: p.sku,
-          category: categorySlug(p.category),
-          category_label: p.category,
-          brand: p.brand,
-          photo_url: p.photo_url,
-          description: p.description,
-          price: Number(p.price_site ?? p.price ?? 0),
-          stock: p.stock,
-          min_stock: p.min_stock,
-          has_variants: p.has_variants,
-          weight_g: p.weight_g,
-          length_cm: Number(p.length_cm),
-          width_cm: Number(p.width_cm),
-          height_cm: Number(p.height_cm),
-          variants: varsByProduct.get(p.id) ?? [],
-        }));
+        const out = (products ?? []).map((p) => {
+          const slug = categorySlug(p.category);
+          return {
+            id: p.id,
+            name: p.name,
+            sku: p.sku,
+            // Compatibilidade com a loja atual: ela usa `category` para produto/kit
+            // e filtra páginas /categoria/:slug pelo campo `subcategory`.
+            category: slug === "kit" ? "kit" : "produto",
+            subcategory: slug,
+            sub_category: slug,
+            categoria: slug,
+            category_slug: slug,
+            category_label: p.category,
+            brand: p.brand,
+            photo_url: p.photo_url,
+            description: p.description,
+            price: Number(p.price_site ?? p.price ?? 0),
+            stock: p.stock,
+            min_stock: p.min_stock,
+            has_variants: p.has_variants,
+            weight_g: p.weight_g,
+            length_cm: Number(p.length_cm),
+            width_cm: Number(p.width_cm),
+            height_cm: Number(p.height_cm),
+            variants: varsByProduct.get(p.id) ?? [],
+          };
+        });
 
         return json({ products: out });
       },
