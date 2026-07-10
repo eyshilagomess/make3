@@ -109,7 +109,7 @@ function Page() {
   const bulkApply = async () => {
     if (selected.size === 0) return;
     const chosen = (["site", "shopee", "tiktok"] as Channel[]).filter((c) => (bulkChannels as any)[c]);
-    if (bulkOn.markup && chosen.length === 0) { toast.error("Escolha ao menos um canal para o markup"); return; }
+    if (bulkOn.markup && chosen.length === 0) { toast.error("Escolha ao menos um canal para a margem"); return; }
     const anything = Object.values(bulkOn).some(Boolean);
     if (!anything) { toast.error("Marque ao menos um campo para alterar"); return; }
     setBulkBusy(true);
@@ -443,9 +443,9 @@ function Page() {
             <TableHead>Produto</TableHead>
             <TableHead>SKU</TableHead>
             <TableHead className="text-right">Custo total</TableHead>
-            <TableHead className="text-right">Site<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
-            <TableHead className="text-right">Shopee<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
-            <TableHead className="text-right">TikTok<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
+            <TableHead className="text-right">Site<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · % lucro</div></TableHead>
+            <TableHead className="text-right">Shopee<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · % lucro</div></TableHead>
+            <TableHead className="text-right">TikTok<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · % lucro</div></TableHead>
             <TableHead>Estoque</TableHead>
             <TableHead className="text-xs">Datas</TableHead>
             <TableHead></TableHead>
@@ -463,12 +463,12 @@ function Page() {
                 const pn = Number(price);
                 const receitaLiquida = pn * (1 - CHANNEL_FEES[ch]);
                 const lucro = receitaLiquida - ct;
-                const markup = ct > 0 ? (lucro / ct) * 100 : 0;
-                const color = markup >= 60 ? "text-emerald-600" : markup >= 45 ? "text-amber-600" : "text-destructive";
+                const margem = pn > 0 ? (lucro / pn) * 100 : 0;
+                const color = margem >= 30 ? "text-emerald-600" : margem >= 15 ? "text-amber-600" : "text-destructive";
                 return (
                   <div className="text-right">
                     <div className="font-semibold tabular-nums">{brl(pn)}</div>
-                    <div className="text-[10px] text-muted-foreground tabular-nums">{brl(lucro)} · <span className={color}>{markup.toFixed(0)}%</span></div>
+                    <div className="text-[10px] text-muted-foreground tabular-nums">{brl(lucro)} · <span className={color}>{margem.toFixed(0)}%</span></div>
                   </div>
                 );
               };
@@ -557,19 +557,19 @@ function Page() {
                 </label>
               </div>
               {(bulkOn.packaging || bulkOn.other) && !bulkOn.markup && (
-                <p className="text-xs text-muted-foreground">Preços serão recalculados mantendo o markup atual de cada canal.</p>
+                <p className="text-xs text-muted-foreground">Preços serão recalculados mantendo a margem de lucro atual de cada canal.</p>
               )}
             </div>
 
-            {/* Markup / preços */}
+            {/* Margem / preços */}
             <div className="rounded-md border p-3 space-y-3">
               <label className="flex items-center gap-2 font-medium text-xs uppercase text-muted-foreground">
                 <Checkbox checked={bulkOn.markup} onCheckedChange={(v) => setBulkOn({ ...bulkOn, markup: Boolean(v) })} />
-                Aplicar markup sobre custo
+                Aplicar margem de lucro
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Markup (%)</Label>
+                  <Label className="text-xs">Margem de lucro (%)</Label>
                   <Input type="number" step="0.1" value={bulkMarkup} onChange={(e) => setBulkMarkup(e.target.value)} disabled={!bulkOn.markup} />
                 </div>
                 <div className="space-y-1">
@@ -793,7 +793,7 @@ function ProductForm({
       <div className="space-y-1.5"><Label>Custo (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={(e) => onCostChange("cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Embalagem (R$)</Label><Input type="number" step="0.01" value={form.packaging_cost} onChange={(e) => onCostChange("packaging_cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Outros custos (R$)</Label><Input type="number" step="0.01" value={form.other_costs} onChange={(e) => onCostChange("other_costs", e.target.value)} placeholder="Ex: brinde, etiqueta…" /></div>
-      <div className="space-y-1.5"><Label>Markup alvo padrão (%)</Label><Input type="number" step="0.1" value={form.target_margin} onChange={(e) => setForm({ ...form, target_margin: e.target.value })} /><p className="text-[10px] text-muted-foreground">Referência exibida na lista. Cada canal abaixo tem markup próprio.</p></div>
+      <div className="space-y-1.5"><Label>Margem de lucro padrão (%)</Label><Input type="number" step="0.1" value={form.target_margin} onChange={(e) => setForm({ ...form, target_margin: e.target.value })} /><p className="text-[10px] text-muted-foreground">% de lucro sobre o preço de venda. Cada canal abaixo pode ter a sua.</p></div>
 
       <div className="col-span-2 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
         <div className="flex items-center justify-between text-xs">
@@ -808,8 +808,8 @@ function ProductForm({
             const feeAmt = price * feePct;
             const receitaLiq = price - feeAmt;
             const lucro = receitaLiq - ct;
-            const markup = ct > 0 && price > 0 ? (lucro / ct) * 100 : 0;
-            const color = markup >= 60 ? "text-emerald-600" : markup >= 45 ? "text-amber-600" : "text-destructive";
+            const margem = price > 0 ? (lucro / price) * 100 : 0;
+            const color = margem >= 30 ? "text-emerald-600" : margem >= 15 ? "text-amber-600" : "text-destructive";
             return (
               <div key={ch} className="rounded-md bg-background/70 p-2 border border-border space-y-1">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex justify-between">
@@ -826,10 +826,10 @@ function ProductForm({
                     />
                   </div>
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-muted-foreground w-10">Markup</span>
+                    <span className="text-[10px] text-muted-foreground w-10">Lucro</span>
                     <Input
                       type="number" step="0.1" className="h-7"
-                      value={ct > 0 && price > 0 ? markup.toFixed(1) : ""}
+                      value={ct > 0 && price > 0 ? margem.toFixed(1) : ""}
                       onChange={(e) => onChannelMarginChange(ch, e.target.value)}
                       placeholder="%"
                     />
@@ -848,8 +848,8 @@ function ProductForm({
           })}
         </div>
         <p className="text-[10px] text-muted-foreground">
-          <strong>Cada canal é independente</strong> — mudar preço ou markup em um NÃO afeta os outros.
-          Markup = lucro líquido ÷ custo. Verde ≥ 60% · amarelo 45–60% · vermelho &lt; 45%.
+          <strong>Cada canal é independente</strong> — mudar preço ou % de lucro em um NÃO afeta os outros.
+          % de lucro = lucro líquido ÷ preço de venda. Verde ≥ 30% · amarelo 15–30% · vermelho &lt; 15%.
         </p>
       </div>
 

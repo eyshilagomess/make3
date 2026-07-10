@@ -28,18 +28,21 @@ export function totalCost(cost: number, packaging: number, other: number) {
 }
 
 /**
- * Calcula preço de venda usando MARKUP sobre o custo total (margem sobre custo).
+ * Calcula preço de venda usando MARGEM DE LUCRO sobre o preço de venda.
  * Definição: lucro_líquido = preço × (1 − comissão) − custo_total
- *            markup       = lucro_líquido / custo_total
- * Fórmula:   preço        = custo_total × (1 + markup) / (1 − comissão)
+ *            margem        = lucro_líquido / preço
+ * Fórmula:   preço         = custo_total / (1 − comissão − margem)
+ *
+ * Ex.: custo R$10, comissão 4%, margem 30% → preço = 10 / (1 - 0,04 - 0,30) = R$15,15
+ * Limite: margem precisa ser < (1 − comissão). Ex.: no Site (4%) máximo 95%.
  */
 export function calcPrice(cost: number, packaging: number, other: number, marginPct: number, channel: Channel): number | null {
   const ct = totalCost(cost, packaging, other);
   if (ct <= 0) return null;
   const m = Number(marginPct || 0) / 100;
-  const denom = 1 - CHANNEL_FEES[channel];
+  const denom = 1 - CHANNEL_FEES[channel] - m;
   if (denom <= 0) return null;
-  return Math.round((ct * (1 + m) / denom) * 100) / 100;
+  return Math.round((ct / denom) * 100) / 100;
 }
 
 export function calcAllPrices(cost: number, packaging: number, other: number, marginPct: number) {
@@ -51,14 +54,14 @@ export function calcAllPrices(cost: number, packaging: number, other: number, ma
 }
 
 /**
- * Calcula o MARKUP (%) sobre o custo total quando o preço de venda é informado.
- * Fórmula: markup = (preço × (1 − comissão) − custo_total) / custo_total
+ * Calcula a MARGEM DE LUCRO (%) sobre o preço de venda quando o preço é informado.
+ * Fórmula: margem = (preço × (1 − comissão) − custo_total) / preço
  */
 export function marginFromPrice(price: number, cost: number, packaging: number, other: number, channel: Channel): number | null {
   const p = Number(price || 0);
   if (p <= 0) return null;
   const ct = totalCost(cost, packaging, other);
   if (ct <= 0) return null;
-  const m = (p * (1 - CHANNEL_FEES[channel]) - ct) / ct;
+  const m = (p * (1 - CHANNEL_FEES[channel]) - ct) / p;
   return Math.round(m * 1000) / 10; // ex: 0.6025 -> 60.3
 }
