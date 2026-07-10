@@ -55,7 +55,6 @@ export const Route = createFileRoute("/api/public/infinitypay/webhook")({
             .update({
               payment_status: "confirmado" as any,
               payment_method: method as any,
-              status: "entregue" as any,
             })
             .eq("id", order.id);
         } else if (refused) {
