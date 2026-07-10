@@ -14,6 +14,21 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function categorySlug(category: string | null | undefined) {
+  const normalized = (category ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+  if (normalized === "skin care" || normalized === "skincare" || normalized === "skin-care") return "skincare";
+  if (normalized === "pele") return "pele";
+  if (normalized === "olhos") return "olhos";
+  if (normalized === "boca") return "boca";
+
+  return normalized.replace(/\s+/g, "-");
+}
+
 export const Route = createFileRoute("/api/public/products/list")({
   server: {
     handlers: {
@@ -58,7 +73,8 @@ export const Route = createFileRoute("/api/public/products/list")({
           id: p.id,
           name: p.name,
           sku: p.sku,
-          category: p.category,
+          category: categorySlug(p.category),
+          category_label: p.category,
           brand: p.brand,
           photo_url: p.photo_url,
           description: p.description,
