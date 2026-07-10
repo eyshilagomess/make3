@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { OrderEmailInfo } from "./notify.server";
 
 type Kind = "created" | "shipped" | "delivered";
 
@@ -25,7 +26,7 @@ export const notifyOrderEvent = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error || !order) return { ok: false, error: error?.message ?? "not_found" };
 
-    const info: notify.OrderEmailInfo = {
+    const info: OrderEmailInfo = {
       order_code: order.order_code,
       channel: order.channel as any,
       total: Number(order.total ?? 0),
