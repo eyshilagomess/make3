@@ -24,6 +24,7 @@ import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAlocacaoRouteImport } from './routes/_authenticated/alocacao'
 import { Route as ApiPublicShippingCalculateRouteImport } from './routes/api/public/shipping/calculate'
 import { Route as ApiPublicProductsListRouteImport } from './routes/api/public/products/list'
+import { Route as ApiPublicOrdersCreateRouteImport } from './routes/api/public/orders/create'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -101,6 +102,11 @@ const ApiPublicProductsListRoute = ApiPublicProductsListRouteImport.update({
   path: '/api/public/products/list',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicOrdersCreateRoute = ApiPublicOrdersCreateRouteImport.update({
+  id: '/api/public/orders/create',
+  path: '/api/public/orders/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/produtos': typeof AuthenticatedProdutosRoute
   '/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
   '/api/public/shipping/calculate': typeof ApiPublicShippingCalculateRoute
 }
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/produtos': typeof AuthenticatedProdutosRoute
   '/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
   '/api/public/shipping/calculate': typeof ApiPublicShippingCalculateRoute
 }
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   '/_authenticated/pedidos': typeof AuthenticatedPedidosRoute
   '/_authenticated/produtos': typeof AuthenticatedProdutosRoute
   '/_authenticated/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
   '/api/public/shipping/calculate': typeof ApiPublicShippingCalculateRoute
 }
@@ -167,6 +176,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/produtos'
     | '/vendas'
+    | '/api/public/orders/create'
     | '/api/public/products/list'
     | '/api/public/shipping/calculate'
   fileRoutesByTo: FileRoutesByTo
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/produtos'
     | '/vendas'
+    | '/api/public/orders/create'
     | '/api/public/products/list'
     | '/api/public/shipping/calculate'
   id:
@@ -200,6 +211,7 @@ export interface FileRouteTypes {
     | '/_authenticated/pedidos'
     | '/_authenticated/produtos'
     | '/_authenticated/vendas'
+    | '/api/public/orders/create'
     | '/api/public/products/list'
     | '/api/public/shipping/calculate'
   fileRoutesById: FileRoutesById
@@ -208,6 +220,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicOrdersCreateRoute: typeof ApiPublicOrdersCreateRoute
   ApiPublicProductsListRoute: typeof ApiPublicProductsListRoute
   ApiPublicShippingCalculateRoute: typeof ApiPublicShippingCalculateRoute
 }
@@ -319,6 +332,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicProductsListRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/orders/create': {
+      id: '/api/public/orders/create'
+      path: '/api/public/orders/create'
+      fullPath: '/api/public/orders/create'
+      preLoaderRoute: typeof ApiPublicOrdersCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -356,6 +376,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicOrdersCreateRoute: ApiPublicOrdersCreateRoute,
   ApiPublicProductsListRoute: ApiPublicProductsListRoute,
   ApiPublicShippingCalculateRoute: ApiPublicShippingCalculateRoute,
 }

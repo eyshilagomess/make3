@@ -148,7 +148,7 @@ export const Route = createFileRoute("/api/public/orders/create")({
             external_reference: body.external_reference ?? null,
             payment_link: body.payment_link ?? null,
             shipping_cep: body.shipping.cep.replace(/\D/g, ""),
-            shipping_address: body.shipping.address ?? null,
+            shipping_address: (body.shipping.address ?? null) as any,
             shipping_carrier: body.shipping.carrier ?? null,
             shipping_service: body.shipping.service ?? null,
             shipping_deadline_days: body.shipping.deadline_days ?? null,
