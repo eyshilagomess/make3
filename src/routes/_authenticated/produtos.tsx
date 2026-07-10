@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, Layers, Trash2, Upload, Download, Pencil, Check, X, FileText, Sparkles } from "lucide-react";
-import { History } from "lucide-react";
+import { History, ImageIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { brl } from "@/lib/format";
@@ -52,6 +52,33 @@ function Page() {
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
+  const [bulkImgBusy, setBulkImgBusy] = useState(false);
+  const searchImgFn = useServerFn(searchProductImage);
+
+  const fillMissingPhotos = async (onlyMissing = true) => {
+    const list = (data ?? []).filter((p: any) => onlyMissing ? !p.photo_url : true);
+    if (list.length === 0) { toast.info("Nada a preencher"); return; }
+    if (!confirm(`Buscar imagens para ${list.length} produto(s)? Você pode alterar depois.`)) return;
+    setBulkImgBusy(true);
+    let ok = 0, fail = 0;
+    const t = toast.loading(`Buscando imagens 0/${list.length}…`);
+    for (let i = 0; i < list.length; i++) {
+      const p: any = list[i];
+      const q = [p.brand, p.name].filter(Boolean).join(" ").trim();
+      try {
+        const r = await searchImgFn({ data: { query: q } });
+        if (r.url) {
+          const { error } = await supabase.from("products").update({ photo_url: r.url }).eq("id", p.id);
+          if (error) throw error;
+          ok++;
+        } else fail++;
+      } catch { fail++; }
+      toast.loading(`Buscando imagens ${i + 1}/${list.length}…`, { id: t });
+    }
+    toast.success(`Concluído: ${ok} preenchidas, ${fail} sem resultado`, { id: t });
+    setBulkImgBusy(false);
+    qc.invalidateQueries({ queryKey: ["products"] });
+  };
 
   const { data } = useQuery({
     queryKey: ["products"],
@@ -180,6 +207,9 @@ function Page() {
       <PageHeader title="Produtos" subtitle="Catálogo e controle de estoque"
         actions={
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => fillMissingPhotos(true)} disabled={bulkImgBusy}>
+            <ImageIcon className="h-4 w-4 mr-1" /> {bulkImgBusy ? "Buscando…" : "Buscar fotos"}
+          </Button>
           <Button variant="outline" onClick={downloadTemplate}><Download className="h-4 w-4 mr-1" /> Modelo</Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-1" /> Importar</Button>
           <Button variant="outline" onClick={() => setInvoiceOpen(true)}><FileText className="h-4 w-4 mr-1" /> Nota fiscal</Button>
