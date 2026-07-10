@@ -456,7 +456,7 @@ function ProductForm({
       <div className="space-y-1.5"><Label>Custo (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={(e) => onCostChange("cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Embalagem (R$)</Label><Input type="number" step="0.01" value={form.packaging_cost} onChange={(e) => onCostChange("packaging_cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Outros custos (R$)</Label><Input type="number" step="0.01" value={form.other_costs} onChange={(e) => onCostChange("other_costs", e.target.value)} placeholder="Ex: brinde, etiqueta…" /></div>
-      <div className="space-y-1.5"><Label>Margem desejada (%)</Label><Input type="number" step="0.1" value={form.target_margin} onChange={(e) => setForm(recalcFromMargin(form, e.target.value))} /></div>
+      <div className="space-y-1.5"><Label>Markup sobre custo (%)</Label><Input type="number" step="0.1" value={form.target_margin} onChange={(e) => setForm(recalcFromMargin(form, e.target.value))} /><p className="text-[10px] text-muted-foreground">Lucro líquido ÷ custo total. Ex.: 60% = R$0,60 de lucro para cada R$1,00 de custo.</p></div>
 
       <div className="col-span-2 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
         <div className="flex items-center justify-between text-xs">

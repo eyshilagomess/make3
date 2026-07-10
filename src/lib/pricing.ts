@@ -28,16 +28,18 @@ export function totalCost(cost: number, packaging: number, other: number) {
 }
 
 /**
- * Calcula preço de venda que cobre o custo total + comissão do canal + margem desejada.
- * Fórmula: preço = custo_total / (1 - comissão - margem)
- * Se a soma de comissão + margem ≥ 1, retorna null (impossível).
+ * Calcula preço de venda usando MARKUP sobre o custo total (margem sobre custo).
+ * Definição: lucro_líquido = preço × (1 − comissão) − custo_total
+ *            markup       = lucro_líquido / custo_total
+ * Fórmula:   preço        = custo_total × (1 + markup) / (1 − comissão)
  */
 export function calcPrice(cost: number, packaging: number, other: number, marginPct: number, channel: Channel): number | null {
   const ct = totalCost(cost, packaging, other);
+  if (ct <= 0) return null;
   const m = Number(marginPct || 0) / 100;
-  const denom = 1 - CHANNEL_FEES[channel] - m;
+  const denom = 1 - CHANNEL_FEES[channel];
   if (denom <= 0) return null;
-  return Math.round((ct / denom) * 100) / 100;
+  return Math.round((ct * (1 + m) / denom) * 100) / 100;
 }
 
 export function calcAllPrices(cost: number, packaging: number, other: number, marginPct: number) {
@@ -49,14 +51,14 @@ export function calcAllPrices(cost: number, packaging: number, other: number, ma
 }
 
 /**
- * Calcula a margem (em %) implícita quando o preço de venda de um canal é informado manualmente.
- * Fórmula: margem = 1 − comissão − custo_total / preço
- * Retorna null se o preço for inválido (≤ 0).
+ * Calcula o MARKUP (%) sobre o custo total quando o preço de venda é informado.
+ * Fórmula: markup = (preço × (1 − comissão) − custo_total) / custo_total
  */
 export function marginFromPrice(price: number, cost: number, packaging: number, other: number, channel: Channel): number | null {
   const p = Number(price || 0);
   if (p <= 0) return null;
   const ct = totalCost(cost, packaging, other);
-  const m = 1 - CHANNEL_FEES[channel] - ct / p;
-  return Math.round(m * 1000) / 10; // ex: 0.3025 -> 30.3
+  if (ct <= 0) return null;
+  const m = (p * (1 - CHANNEL_FEES[channel]) - ct) / ct;
+  return Math.round(m * 1000) / 10; // ex: 0.6025 -> 60.3
 }
