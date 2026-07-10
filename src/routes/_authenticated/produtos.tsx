@@ -344,6 +344,25 @@ function ProductForm({
 
   const ct = totalCost(Number(form.cost || 0), Number(form.packaging_cost || 0), Number(form.other_costs || 0));
 
+  const searchImg = useServerFn(searchProductImage);
+  const [imgBusy, setImgBusy] = useState(false);
+  const [imgCandidates, setImgCandidates] = useState<string[]>([]);
+
+  const runImageSearch = async () => {
+    const q = [form.brand, form.name].filter(Boolean).join(" ").trim();
+    if (!q) return toast.error("Preencha o nome do produto primeiro");
+    setImgBusy(true);
+    try {
+      const r = await searchImg({ data: { query: q } });
+      if (!r.url) { toast.error("Nada encontrado"); return; }
+      setForm({ ...form, photo_url: r.url });
+      setImgCandidates(r.candidates);
+      toast.success("Imagem encontrada — pode trocar por outra abaixo");
+    } catch (e: any) {
+      toast.error(e.message || "Erro na busca");
+    } finally { setImgBusy(false); }
+  };
+
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="grid grid-cols-2 gap-3 max-h-[70vh] overflow-y-auto pr-2">
       <div className="col-span-2 space-y-1.5"><Label>Nome *</Label><Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
@@ -356,7 +375,43 @@ function ProductForm({
           <SelectContent>{suppliers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      <div className="col-span-2 space-y-1.5"><Label>URL da foto</Label><Input value={form.photo_url} onChange={(e) => setForm({ ...form, photo_url: e.target.value })} placeholder="https://…" /></div>
+      <div className="col-span-2 space-y-1.5">
+        <Label>Foto do produto</Label>
+        <div className="flex items-start gap-3">
+          {form.photo_url ? (
+            <img src={form.photo_url} alt="" className="h-20 w-20 rounded-md object-cover border" onError={(e) => ((e.target as HTMLImageElement).style.opacity = "0.3")} />
+          ) : (
+            <div className="h-20 w-20 rounded-md bg-muted border flex items-center justify-center text-[10px] text-muted-foreground text-center px-1">sem foto</div>
+          )}
+          <div className="flex-1 space-y-2">
+            <Input value={form.photo_url} onChange={(e) => setForm({ ...form, photo_url: e.target.value })} placeholder="https://… (cole uma URL ou busque na internet)" />
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={runImageSearch} disabled={imgBusy}>
+                <Search className="h-3 w-3 mr-1" />
+                {imgBusy ? "Buscando…" : "Buscar imagem na internet"}
+              </Button>
+              {form.photo_url && (
+                <Button type="button" size="sm" variant="ghost" onClick={() => setForm({ ...form, photo_url: "" })}>
+                  <X className="h-3 w-3 mr-1" /> Remover
+                </Button>
+              )}
+            </div>
+            {imgCandidates.length > 1 && (
+              <div className="space-y-1">
+                <div className="text-[10px] text-muted-foreground">Outras opções (clique para escolher):</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {imgCandidates.map((u) => (
+                    <button type="button" key={u} onClick={() => setForm({ ...form, photo_url: u })}
+                      className={`h-12 w-12 rounded border overflow-hidden ${form.photo_url === u ? "ring-2 ring-primary" : ""}`}>
+                      <img src={u} alt="" className="h-full w-full object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
       <div className="space-y-1.5"><Label>Custo (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={(e) => onCostChange("cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Embalagem (R$)</Label><Input type="number" step="0.01" value={form.packaging_cost} onChange={(e) => onCostChange("packaging_cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Outros custos (R$)</Label><Input type="number" step="0.01" value={form.other_costs} onChange={(e) => onCostChange("other_costs", e.target.value)} placeholder="Ex: brinde, etiqueta…" /></div>
