@@ -114,7 +114,18 @@ function Page() {
 
   const create = useMutation({
     mutationFn: async (f: Form) => {
-      const { data: p, error } = await supabase.from("products").insert(buildPayload(f)).select("id").single();
+      let payload = buildPayload(f);
+      // Se o usuário não colocou foto, tenta buscar automaticamente na internet
+      if (!payload.photo_url) {
+        const q = [f.brand, f.name].filter(Boolean).join(" ").trim();
+        if (q) {
+          try {
+            const r = await searchImgFn({ data: { query: q } });
+            if (r.url) payload = { ...payload, photo_url: r.url };
+          } catch { /* segue sem foto */ }
+        }
+      }
+      const { data: p, error } = await supabase.from("products").insert(payload).select("id").single();
       if (error) throw error;
       if (!f.has_variants && Number(f.stock) > 0) {
         await supabase.from("stock_movements").insert({
