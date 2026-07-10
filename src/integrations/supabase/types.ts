@@ -44,6 +44,138 @@ export type Database = {
         }
         Relationships: []
       }
+      coupon_redemptions: {
+        Row: {
+          channel: string | null
+          coupon_id: string
+          created_at: string
+          customer_email: string | null
+          customer_phone: string | null
+          discount_applied: number
+          id: string
+          order_id: string | null
+          order_subtotal: number | null
+        }
+        Insert: {
+          channel?: string | null
+          coupon_id: string
+          created_at?: string
+          customer_email?: string | null
+          customer_phone?: string | null
+          discount_applied?: number
+          id?: string
+          order_id?: string | null
+          order_subtotal?: number | null
+        }
+        Update: {
+          channel?: string | null
+          coupon_id?: string
+          created_at?: string
+          customer_email?: string | null
+          customer_phone?: string | null
+          discount_applied?: number
+          id?: string
+          order_id?: string | null
+          order_subtotal?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_redemptions_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_redemptions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coupons: {
+        Row: {
+          active: boolean
+          applies_to: string
+          category_slugs: string[]
+          channels: string[]
+          code: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          discount_type: string
+          discount_value: number
+          first_purchase_only: boolean
+          free_shipping: boolean
+          id: string
+          max_discount: number | null
+          min_order_value: number
+          notes: string | null
+          per_customer_limit: number | null
+          product_ids: string[]
+          stackable: boolean
+          updated_at: string
+          usage_limit: number | null
+          used_count: number
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          active?: boolean
+          applies_to?: string
+          category_slugs?: string[]
+          channels?: string[]
+          code: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          discount_type: string
+          discount_value: number
+          first_purchase_only?: boolean
+          free_shipping?: boolean
+          id?: string
+          max_discount?: number | null
+          min_order_value?: number
+          notes?: string | null
+          per_customer_limit?: number | null
+          product_ids?: string[]
+          stackable?: boolean
+          updated_at?: string
+          usage_limit?: number | null
+          used_count?: number
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          active?: boolean
+          applies_to?: string
+          category_slugs?: string[]
+          channels?: string[]
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          first_purchase_only?: boolean
+          free_shipping?: boolean
+          id?: string
+          max_discount?: number | null
+          min_order_value?: number
+          notes?: string | null
+          per_customer_limit?: number | null
+          product_ids?: string[]
+          stackable?: boolean
+          updated_at?: string
+          usage_limit?: number | null
+          used_count?: number
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
