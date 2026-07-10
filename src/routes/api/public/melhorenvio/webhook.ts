@@ -121,7 +121,7 @@ export const Route = createFileRoute("/api/public/melhorenvio/webhook")({
         const updates: Record<string, unknown> = {};
         if (nextStatus) updates.status = nextStatus;
         if (tracking) updates.tracking_code = tracking;
-        if (protocol) updates.shipping_protocol = protocol;
+        void protocol;
 
         if (Object.keys(updates).length > 0) {
           await supabaseAdmin.from("orders").update(updates as any).eq("id", order.id);
