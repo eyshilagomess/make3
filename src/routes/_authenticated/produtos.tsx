@@ -557,19 +557,19 @@ function Page() {
                 </label>
               </div>
               {(bulkOn.packaging || bulkOn.other) && !bulkOn.markup && (
-                <p className="text-xs text-muted-foreground">Preços serão recalculados mantendo o markup atual de cada canal.</p>
+                <p className="text-xs text-muted-foreground">Preços serão recalculados mantendo a margem de lucro atual de cada canal.</p>
               )}
             </div>
 
-            {/* Markup / preços */}
+            {/* Margem / preços */}
             <div className="rounded-md border p-3 space-y-3">
               <label className="flex items-center gap-2 font-medium text-xs uppercase text-muted-foreground">
                 <Checkbox checked={bulkOn.markup} onCheckedChange={(v) => setBulkOn({ ...bulkOn, markup: Boolean(v) })} />
-                Aplicar markup sobre custo
+                Aplicar margem de lucro
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Markup (%)</Label>
+                  <Label className="text-xs">Margem de lucro (%)</Label>
                   <Input type="number" step="0.1" value={bulkMarkup} onChange={(e) => setBulkMarkup(e.target.value)} disabled={!bulkOn.markup} />
                 </div>
                 <div className="space-y-1">
