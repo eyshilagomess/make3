@@ -14,7 +14,7 @@ export const notifyOrderEvent = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { orderId, kind } = data;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const notify = await import("./notify.server");
+    const notify: typeof import("./notify.server") = await import("./notify.server");
 
     const { data: order, error } = await context.supabase
       .from("orders")
