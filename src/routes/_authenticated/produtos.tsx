@@ -20,6 +20,7 @@ import { calcAllPrices, calcPrice, marginFromPrice, CHANNEL_FEES, CHANNEL_LABEL,
 import * as XLSX from "xlsx";
 import { useServerFn } from "@tanstack/react-start";
 import { extractFromImage } from "@/lib/extract-invoice.functions";
+import { searchProductImage } from "@/lib/search-image.functions";
 
 export const Route = createFileRoute("/_authenticated/produtos")({
   head: () => ({ meta: [{ title: "Produtos — Make 3" }] }),
