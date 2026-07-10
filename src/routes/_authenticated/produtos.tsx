@@ -200,8 +200,11 @@ function Page() {
     });
   };
 
-  const fillMissingPhotos = async (onlyMissing = true) => {
-    const list = (data ?? []).filter((p: any) => onlyMissing ? !p.photo_url : true);
+  const fillMissingPhotos = async (onlyMissing = true, ids?: Set<string>) => {
+    const base = ids && ids.size > 0
+      ? (data ?? []).filter((p: any) => ids.has(p.id))
+      : (data ?? []);
+    const list = base.filter((p: any) => onlyMissing ? !p.photo_url : true);
     if (list.length === 0) { toast.info("Nada a preencher"); return; }
     if (!confirm(`Buscar imagens para ${list.length} produto(s)? Você pode alterar depois.`)) return;
     setBulkImgBusy(true);
@@ -223,6 +226,11 @@ function Page() {
     toast.success(`Concluído: ${ok} preenchidas, ${fail} sem resultado`, { id: t });
     setBulkImgBusy(false);
     qc.invalidateQueries({ queryKey: ["products"] });
+  };
+
+  const bulkFetchImages = async (onlyMissing: boolean) => {
+    if (selected.size === 0) return;
+    await fillMissingPhotos(onlyMissing, selected);
   };
 
   const { data } = useQuery({
