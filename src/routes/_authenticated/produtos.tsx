@@ -436,6 +436,35 @@ function Page() {
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <InvoiceDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <CostHistoryDialog open={!!historyFor} product={historyFor} onClose={() => setHistoryFor(null)} />
+      <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Editar preços em massa</DialogTitle></DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">Aplicar o markup abaixo a {selected.size} produto(s), recalculando o preço a partir do custo total.</p>
+            <div className="space-y-1.5">
+              <Label>Markup sobre custo (%)</Label>
+              <Input type="number" step="0.1" value={bulkMarkup} onChange={(e) => setBulkMarkup(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Canais</Label>
+              <div className="flex flex-wrap gap-3">
+                {(["site", "shopee", "tiktok"] as Channel[]).map((ch) => (
+                  <label key={ch} className="flex items-center gap-1.5 cursor-pointer">
+                    <Checkbox checked={(bulkChannels as any)[ch]} onCheckedChange={(v) => setBulkChannels({ ...bulkChannels, [ch]: Boolean(v) })} />
+                    <span>{CHANNEL_LABEL[ch]}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setBulkEditOpen(false)}>Cancelar</Button>
+              <Button onClick={bulkApplyMarkup} disabled={bulkBusy} className="bg-gradient-brand text-primary-foreground border-0">
+                {bulkBusy ? "Aplicando…" : "Aplicar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={!!editingId} onOpenChange={(v) => !v && (setEditingId(null), setForm(empty))}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Editar produto {editingProduct?.name ? `— ${editingProduct.name}` : ""}</DialogTitle></DialogHeader>
