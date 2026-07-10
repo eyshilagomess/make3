@@ -45,6 +45,7 @@ function Page() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"name_asc" | "name_desc" | "recent" | "oldest" | "price_asc" | "price_desc" | "stock_asc" | "stock_desc">("name_asc");
   const [variantsFor, setVariantsFor] = useState<{ id: string; name: string } | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -154,7 +155,23 @@ function Page() {
     setEditingId(p.id);
   };
 
-  const filtered = (data ?? []).filter((p: any) => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku?.toLowerCase().includes(search.toLowerCase()));
+  const filtered = (() => {
+    const list = (data ?? []).filter((p: any) => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku?.toLowerCase().includes(search.toLowerCase()));
+    const stockOf = (p: any) => p.has_variants ? (p.product_variants ?? []).reduce((s: number, v: any) => s + (v.stock ?? 0), 0) : (p.stock ?? 0);
+    const priceOf = (p: any) => p.price_site != null ? Number(p.price_site) : Number.POSITIVE_INFINITY;
+    const sorted = [...list];
+    switch (sortBy) {
+      case "name_asc": sorted.sort((a, b) => a.name.localeCompare(b.name, "pt-BR")); break;
+      case "name_desc": sorted.sort((a, b) => b.name.localeCompare(a.name, "pt-BR")); break;
+      case "recent": sorted.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? "")); break;
+      case "oldest": sorted.sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? "")); break;
+      case "price_asc": sorted.sort((a, b) => priceOf(a) - priceOf(b)); break;
+      case "price_desc": sorted.sort((a, b) => priceOf(b) - priceOf(a)); break;
+      case "stock_asc": sorted.sort((a, b) => stockOf(a) - stockOf(b)); break;
+      case "stock_desc": sorted.sort((a, b) => stockOf(b) - stockOf(a)); break;
+    }
+    return sorted;
+  })();
   const editingProduct = editingId ? (data ?? []).find((p: any) => p.id === editingId) : null;
 
   return (
@@ -183,9 +200,24 @@ function Page() {
       />
 
       <Card className="p-4 shadow-card">
-        <div className="flex items-center gap-2 mb-4">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar por nome ou SKU…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar por nome ou SKU…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
+          </div>
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+            <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name_asc">Nome (A → Z)</SelectItem>
+              <SelectItem value="name_desc">Nome (Z → A)</SelectItem>
+              <SelectItem value="recent">Mais recentes</SelectItem>
+              <SelectItem value="oldest">Mais antigos</SelectItem>
+              <SelectItem value="price_asc">Menor preço (Site)</SelectItem>
+              <SelectItem value="price_desc">Maior preço (Site)</SelectItem>
+              <SelectItem value="stock_asc">Menor estoque</SelectItem>
+              <SelectItem value="stock_desc">Maior estoque</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <Table>
           <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>SKU</TableHead><TableHead>Custo total</TableHead><TableHead>Site</TableHead><TableHead>Shopee</TableHead><TableHead>TikTok</TableHead><TableHead>Lucro un.</TableHead><TableHead>Margem</TableHead><TableHead>Estoque</TableHead><TableHead></TableHead></TableRow></TableHeader>
