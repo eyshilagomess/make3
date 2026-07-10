@@ -488,19 +488,43 @@ function ProductForm({
           <span className="font-semibold">{brl(ct)}</span>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          {(["site", "shopee", "tiktok"] as Channel[]).map((ch) => (
-            <div key={ch} className="rounded-md bg-background/70 p-2 border border-border space-y-1">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{CHANNEL_LABEL[ch]} · {(CHANNEL_FEES[ch] * 100).toFixed(0)}%</div>
-              <Input
-                type="number" step="0.01" className="h-8 font-semibold"
-                value={ch === "site" ? form.price_site : ch === "shopee" ? form.price_shopee : form.price_tiktok}
-                onChange={(e) => onPriceChange(ch, e.target.value)}
-                placeholder="0,00"
-              />
-            </div>
-          ))}
+          {(["site", "shopee", "tiktok"] as Channel[]).map((ch) => {
+            const raw = ch === "site" ? form.price_site : ch === "shopee" ? form.price_shopee : form.price_tiktok;
+            const price = Number(raw || 0);
+            const feePct = CHANNEL_FEES[ch];
+            const feeAmt = price * feePct;
+            const receitaLiq = price - feeAmt;
+            const lucro = receitaLiq - ct;
+            const markup = ct > 0 && price > 0 ? (lucro / ct) * 100 : 0;
+            const color = markup >= 60 ? "text-emerald-600" : markup >= 45 ? "text-amber-600" : "text-destructive";
+            return (
+              <div key={ch} className="rounded-md bg-background/70 p-2 border border-border space-y-1">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex justify-between">
+                  <span>{CHANNEL_LABEL[ch]}</span><span>comissão {(feePct * 100).toFixed(0)}%</span>
+                </div>
+                <Input
+                  type="number" step="0.01" className="h-8 font-semibold"
+                  value={raw}
+                  onChange={(e) => onPriceChange(ch, e.target.value)}
+                  placeholder="0,00"
+                />
+                {price > 0 && (
+                  <div className="text-[10px] space-y-0.5 tabular-nums">
+                    <div className="flex justify-between text-muted-foreground"><span>− comissão</span><span>{brl(feeAmt)}</span></div>
+                    <div className="flex justify-between text-muted-foreground"><span>− custo</span><span>{brl(ct)}</span></div>
+                    <div className="flex justify-between font-semibold"><span>= lucro</span><span className={color}>{brl(lucro)}</span></div>
+                    <div className={`flex justify-between ${color}`}><span>markup</span><span>{markup.toFixed(1)}%</span></div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-        <p className="text-[10px] text-muted-foreground">Mexa na margem ou digite o preço final em qualquer canal — o outro lado é recalculado automaticamente.</p>
+        <p className="text-[10px] text-muted-foreground">
+          <strong>Markup</strong> = lucro líquido ÷ custo. Ex.: R$1,00 de custo com markup 60% = R$0,60 de lucro depois da comissão.
+          Mexa no markup ou digite o preço final — o outro lado é recalculado automaticamente.
+          <span className="block mt-1">Verde ≥ 60% (ideal) · amarelo 45–60% (aceitável) · vermelho &lt; 45% (revisar).</span>
+        </p>
       </div>
 
       <div className="col-span-2 flex items-start gap-2 rounded-md border border-border p-3 bg-muted/30">
