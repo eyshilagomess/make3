@@ -694,37 +694,47 @@ function ProductForm({
   submitting: boolean; submitLabel: string; stockEditable: boolean;
   onCancel: () => void; onSubmit: () => void;
 }) {
-  // Cada canal tem markup INDEPENDENTE. Editar preço/markup de um canal
-  // NÃO altera os outros — o lojista escolhe estratégia por plataforma.
   const priceKey = (ch: Channel) => (ch === "site" ? "price_site" : ch === "shopee" ? "price_shopee" : "price_tiktok") as "price_site" | "price_shopee" | "price_tiktok";
+  const marginKey = (ch: Channel) => (ch === "site" ? "margin_site" : ch === "shopee" ? "margin_shopee" : "margin_tiktok") as "margin_site" | "margin_shopee" | "margin_tiktok";
+
+  const onDefaultMarginChange = (marginStr: string) => {
+    const c = Number(form.cost || 0), pk = Number(form.packaging_cost || 0), o = Number(form.other_costs || 0);
+    const next: Form = {
+      ...form,
+      target_margin: marginStr,
+      margin_site: marginStr,
+      margin_shopee: marginStr,
+      margin_tiktok: marginStr,
+    };
+    (["site", "shopee", "tiktok"] as Channel[]).forEach((ch) => {
+      const p = calcPrice(c, pk, o, Number(marginStr || 0), ch);
+      (next as any)[priceKey(ch)] = p != null ? String(p) : "";
+    });
+    setForm(next);
+  };
 
   const onChannelMarginChange = (ch: Channel, marginStr: string) => {
     const c = Number(form.cost || 0), pk = Number(form.packaging_cost || 0), o = Number(form.other_costs || 0);
     const p = calcPrice(c, pk, o, Number(marginStr || 0), ch);
-    const next: Form = { ...form, [priceKey(ch)]: p != null ? String(p) : "" } as Form;
-    if (ch === "site") next.target_margin = marginStr;
+    const next: Form = { ...form, [marginKey(ch)]: marginStr, [priceKey(ch)]: p != null ? String(p) : "" } as Form;
     setForm(next);
   };
 
   const onPriceChange = (ch: Channel, value: string) => {
     const next: Form = { ...form, [priceKey(ch)]: value } as Form;
-    if (ch === "site") {
-      const c = Number(form.cost || 0), pk = Number(form.packaging_cost || 0), o = Number(form.other_costs || 0);
-      const m = marginFromPrice(Number(value || 0), c, pk, o, "site");
-      if (m != null) next.target_margin = String(m);
-    }
+    const c = Number(form.cost || 0), pk = Number(form.packaging_cost || 0), o = Number(form.other_costs || 0);
+    const m = marginFromPrice(Number(value || 0), c, pk, o, ch);
+    if (m != null) (next as any)[marginKey(ch)] = String(m);
     setForm(next);
   };
 
-  // Ao mexer nos custos, mantém o markup de cada canal e recalcula seus preços.
+  // Ao mexer nos custos, mantém a margem de lucro configurada em cada canal e recalcula só os preços.
   const onCostChange = (key: "cost" | "packaging_cost" | "other_costs", value: string) => {
     const nc = { ...form, [key]: value };
     const c = Number(nc.cost || 0), pk = Number(nc.packaging_cost || 0), o = Number(nc.other_costs || 0);
     const next: Form = { ...nc } as Form;
     (["site", "shopee", "tiktok"] as Channel[]).forEach((ch) => {
-      const currentPrice = Number((form as any)[priceKey(ch)] || 0);
-      const oldC = Number(form.cost || 0), oldPk = Number(form.packaging_cost || 0), oldO = Number(form.other_costs || 0);
-      const m = currentPrice > 0 ? marginFromPrice(currentPrice, oldC, oldPk, oldO, ch) : Number(form.target_margin || 0);
+      const m = Number((form as any)[marginKey(ch)] || form.target_margin || 0);
       const p = calcPrice(c, pk, o, m ?? 0, ch);
       (next as any)[priceKey(ch)] = p != null ? String(p) : "";
     });
@@ -804,16 +814,17 @@ function ProductForm({
       <div className="space-y-1.5"><Label>Custo (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={(e) => onCostChange("cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Embalagem (R$)</Label><Input type="number" step="0.01" value={form.packaging_cost} onChange={(e) => onCostChange("packaging_cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Outros custos (R$)</Label><Input type="number" step="0.01" value={form.other_costs} onChange={(e) => onCostChange("other_costs", e.target.value)} placeholder="Ex: brinde, etiqueta…" /></div>
-      <div className="space-y-1.5"><Label>Margem de lucro padrão (%)</Label><Input type="number" step="0.1" value={form.target_margin} onChange={(e) => setForm({ ...form, target_margin: e.target.value })} /><p className="text-[10px] text-muted-foreground">% de lucro sobre o preço de venda. Cada canal abaixo pode ter a sua.</p></div>
+      <div className="space-y-1.5"><Label>Margem de lucro padrão (%)</Label><Input type="number" step="0.1" value={form.target_margin} onChange={(e) => onDefaultMarginChange(e.target.value)} /><p className="text-[10px] text-muted-foreground">Altera todas as plataformas de uma vez. Depois, ajuste Site, Shopee ou TikTok separadamente abaixo.</p></div>
 
       <div className="col-span-2 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Custo total (custo + embalagem + outros)</span>
           <span className="font-semibold">{brl(ct)}</span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {(["site", "shopee", "tiktok"] as Channel[]).map((ch) => {
             const raw = ch === "site" ? form.price_site : ch === "shopee" ? form.price_shopee : form.price_tiktok;
+            const marginRaw = (form as any)[marginKey(ch)] as string;
             const price = Number(raw || 0);
             const feePct = CHANNEL_FEES[ch];
             const feeAmt = price * feePct;
@@ -840,7 +851,7 @@ function ProductForm({
                     <span className="text-[10px] text-muted-foreground w-10">Lucro</span>
                     <Input
                       type="number" step="0.1" className="h-7"
-                      value={ct > 0 && price > 0 ? margem.toFixed(1) : ""}
+                      value={marginRaw}
                       onChange={(e) => onChannelMarginChange(ch, e.target.value)}
                       placeholder="%"
                     />
