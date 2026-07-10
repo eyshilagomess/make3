@@ -443,9 +443,9 @@ function Page() {
             <TableHead>Produto</TableHead>
             <TableHead>SKU</TableHead>
             <TableHead className="text-right">Custo total</TableHead>
-            <TableHead className="text-right">Site<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
-            <TableHead className="text-right">Shopee<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
-            <TableHead className="text-right">TikTok<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
+            <TableHead className="text-right">Site<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · % lucro</div></TableHead>
+            <TableHead className="text-right">Shopee<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · % lucro</div></TableHead>
+            <TableHead className="text-right">TikTok<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · % lucro</div></TableHead>
             <TableHead>Estoque</TableHead>
             <TableHead className="text-xs">Datas</TableHead>
             <TableHead></TableHead>
@@ -463,12 +463,12 @@ function Page() {
                 const pn = Number(price);
                 const receitaLiquida = pn * (1 - CHANNEL_FEES[ch]);
                 const lucro = receitaLiquida - ct;
-                const markup = ct > 0 ? (lucro / ct) * 100 : 0;
-                const color = markup >= 60 ? "text-emerald-600" : markup >= 45 ? "text-amber-600" : "text-destructive";
+                const margem = pn > 0 ? (lucro / pn) * 100 : 0;
+                const color = margem >= 30 ? "text-emerald-600" : margem >= 15 ? "text-amber-600" : "text-destructive";
                 return (
                   <div className="text-right">
                     <div className="font-semibold tabular-nums">{brl(pn)}</div>
-                    <div className="text-[10px] text-muted-foreground tabular-nums">{brl(lucro)} · <span className={color}>{markup.toFixed(0)}%</span></div>
+                    <div className="text-[10px] text-muted-foreground tabular-nums">{brl(lucro)} · <span className={color}>{margem.toFixed(0)}%</span></div>
                   </div>
                 );
               };
