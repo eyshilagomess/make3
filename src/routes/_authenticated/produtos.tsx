@@ -262,15 +262,38 @@ function Page() {
           </Select>
         </div>
         <Table>
-          <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>SKU</TableHead><TableHead>Custo total</TableHead><TableHead>Site</TableHead><TableHead>Shopee</TableHead><TableHead>TikTok</TableHead><TableHead>Lucro un.</TableHead><TableHead>Margem</TableHead><TableHead>Estoque</TableHead><TableHead></TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow>
+            <TableHead>Produto</TableHead>
+            <TableHead>SKU</TableHead>
+            <TableHead className="text-right">Custo total</TableHead>
+            <TableHead className="text-right">Site<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
+            <TableHead className="text-right">Shopee<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
+            <TableHead className="text-right">TikTok<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
+            <TableHead>Estoque</TableHead>
+            <TableHead></TableHead>
+          </TableRow></TableHeader>
           <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
             {filtered.map((p: any) => {
               const variants = p.product_variants ?? [];
               const totalStock = p.has_variants ? variants.reduce((s: number, v: any) => s + (v.stock ?? 0), 0) : p.stock;
               const lowVariant = p.has_variants && variants.some((v: any) => (v.stock ?? 0) <= (v.min_stock ?? 0));
               const low = p.has_variants ? lowVariant : p.stock <= p.min_stock;
               const ct = totalCost(p.cost, p.packaging_cost, p.other_costs);
+              const cell = (price: any, ch: Channel) => {
+                if (price == null) return <div className="text-muted-foreground text-right">—</div>;
+                const pn = Number(price);
+                const receitaLiquida = pn * (1 - CHANNEL_FEES[ch]);
+                const lucro = receitaLiquida - ct;
+                const markup = ct > 0 ? (lucro / ct) * 100 : 0;
+                const color = markup >= 60 ? "text-emerald-600" : markup >= 45 ? "text-amber-600" : "text-destructive";
+                return (
+                  <div className="text-right">
+                    <div className="font-semibold tabular-nums">{brl(pn)}</div>
+                    <div className="text-[10px] text-muted-foreground tabular-nums">{brl(lucro)} · <span className={color}>{markup.toFixed(0)}%</span></div>
+                  </div>
+                );
+              };
               return (
                 <TableRow key={p.id}>
                   <TableCell>
@@ -283,12 +306,13 @@ function Page() {
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{p.sku ?? "—"}</TableCell>
-                  <TableCell className="text-sm">{brl(ct)}<div className="text-[10px] text-muted-foreground">margem {Number(p.target_margin ?? 0)}%</div></TableCell>
-                  <TableCell className="font-semibold">{p.price_site != null ? brl(p.price_site) : "—"}</TableCell>
-                  <TableCell className="font-semibold">{p.price_shopee != null ? brl(p.price_shopee) : "—"}</TableCell>
-                  <TableCell className="font-semibold">{p.price_tiktok != null ? brl(p.price_tiktok) : "—"}</TableCell>
-                  <TableCell className="text-sm tabular-nums">{p.price_site != null ? brl(Number(p.price_site) - ct) : "—"}</TableCell>
-                  <TableCell className="text-sm tabular-nums">{p.price_site != null && Number(p.price_site) > 0 ? `${(((Number(p.price_site) - ct) / Number(p.price_site)) * 100).toFixed(1)}%` : "—"}</TableCell>
+                  <TableCell className="text-right text-sm tabular-nums">
+                    <div className="font-medium">{brl(ct)}</div>
+                    <div className="text-[10px] text-muted-foreground">alvo {Number(p.target_margin ?? 0)}%</div>
+                  </TableCell>
+                  <TableCell>{cell(p.price_site, "site")}</TableCell>
+                  <TableCell>{cell(p.price_shopee, "shopee")}</TableCell>
+                  <TableCell>{cell(p.price_tiktok, "tiktok")}</TableCell>
                   <TableCell>
                     <Badge variant={low ? "destructive" : "secondary"} className="font-mono">{totalStock}{p.has_variants ? ` (total)` : low ? ` / mín ${p.min_stock}` : ""}</Badge>
                   </TableCell>
@@ -464,19 +488,43 @@ function ProductForm({
           <span className="font-semibold">{brl(ct)}</span>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          {(["site", "shopee", "tiktok"] as Channel[]).map((ch) => (
-            <div key={ch} className="rounded-md bg-background/70 p-2 border border-border space-y-1">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{CHANNEL_LABEL[ch]} · {(CHANNEL_FEES[ch] * 100).toFixed(0)}%</div>
-              <Input
-                type="number" step="0.01" className="h-8 font-semibold"
-                value={ch === "site" ? form.price_site : ch === "shopee" ? form.price_shopee : form.price_tiktok}
-                onChange={(e) => onPriceChange(ch, e.target.value)}
-                placeholder="0,00"
-              />
-            </div>
-          ))}
+          {(["site", "shopee", "tiktok"] as Channel[]).map((ch) => {
+            const raw = ch === "site" ? form.price_site : ch === "shopee" ? form.price_shopee : form.price_tiktok;
+            const price = Number(raw || 0);
+            const feePct = CHANNEL_FEES[ch];
+            const feeAmt = price * feePct;
+            const receitaLiq = price - feeAmt;
+            const lucro = receitaLiq - ct;
+            const markup = ct > 0 && price > 0 ? (lucro / ct) * 100 : 0;
+            const color = markup >= 60 ? "text-emerald-600" : markup >= 45 ? "text-amber-600" : "text-destructive";
+            return (
+              <div key={ch} className="rounded-md bg-background/70 p-2 border border-border space-y-1">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex justify-between">
+                  <span>{CHANNEL_LABEL[ch]}</span><span>comissão {(feePct * 100).toFixed(0)}%</span>
+                </div>
+                <Input
+                  type="number" step="0.01" className="h-8 font-semibold"
+                  value={raw}
+                  onChange={(e) => onPriceChange(ch, e.target.value)}
+                  placeholder="0,00"
+                />
+                {price > 0 && (
+                  <div className="text-[10px] space-y-0.5 tabular-nums">
+                    <div className="flex justify-between text-muted-foreground"><span>− comissão</span><span>{brl(feeAmt)}</span></div>
+                    <div className="flex justify-between text-muted-foreground"><span>− custo</span><span>{brl(ct)}</span></div>
+                    <div className="flex justify-between font-semibold"><span>= lucro</span><span className={color}>{brl(lucro)}</span></div>
+                    <div className={`flex justify-between ${color}`}><span>markup</span><span>{markup.toFixed(1)}%</span></div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-        <p className="text-[10px] text-muted-foreground">Mexa na margem ou digite o preço final em qualquer canal — o outro lado é recalculado automaticamente.</p>
+        <p className="text-[10px] text-muted-foreground">
+          <strong>Markup</strong> = lucro líquido ÷ custo. Ex.: R$1,00 de custo com markup 60% = R$0,60 de lucro depois da comissão.
+          Mexa no markup ou digite o preço final — o outro lado é recalculado automaticamente.
+          <span className="block mt-1">Verde ≥ 60% (ideal) · amarelo 45–60% (aceitável) · vermelho &lt; 45% (revisar).</span>
+        </p>
       </div>
 
       <div className="col-span-2 flex items-start gap-2 rounded-md border border-border p-3 bg-muted/30">
