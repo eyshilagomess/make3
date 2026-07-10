@@ -58,6 +58,28 @@ function Page() {
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkMarkup, setBulkMarkup] = useState("60");
   const [bulkChannels, setBulkChannels] = useState<{ site: boolean; shopee: boolean; tiktok: boolean }>({ site: true, shopee: false, tiktok: false });
+  // Campos adicionais para edição em massa
+  type BulkFields = {
+    markup: boolean;
+    packaging: boolean;
+    other: boolean;
+    category: boolean;
+    brand: boolean;
+    supplier: boolean;
+    min_stock: boolean;
+    stock: boolean;
+  };
+  const [bulkOn, setBulkOn] = useState<BulkFields>({
+    markup: true, packaging: false, other: false, category: false, brand: false, supplier: false, min_stock: false, stock: false,
+  });
+  const [bulkPackaging, setBulkPackaging] = useState("1.20");
+  const [bulkOther, setBulkOther] = useState("0");
+  const [bulkCategory, setBulkCategory] = useState("");
+  const [bulkBrand, setBulkBrand] = useState("");
+  const [bulkSupplier, setBulkSupplier] = useState("");
+  const [bulkMinStock, setBulkMinStock] = useState("0");
+  const [bulkStock, setBulkStock] = useState("0");
+  const [bulkStockMode, setBulkStockMode] = useState<"set" | "add">("set");
   const [bulkBusy, setBulkBusy] = useState(false);
 
   const toggleOne = (id: string, on: boolean) => {
@@ -84,26 +106,80 @@ function Page() {
     finally { setBulkBusy(false); }
   };
 
-  const bulkApplyMarkup = async () => {
-    const m = Number(bulkMarkup || 0);
-    if (!m || selected.size === 0) return;
+  const bulkApply = async () => {
+    if (selected.size === 0) return;
     const chosen = (["site", "shopee", "tiktok"] as Channel[]).filter((c) => (bulkChannels as any)[c]);
-    if (chosen.length === 0) { toast.error("Escolha ao menos um canal"); return; }
+    if (bulkOn.markup && chosen.length === 0) { toast.error("Escolha ao menos um canal para o markup"); return; }
+    const anything = Object.values(bulkOn).some(Boolean);
+    if (!anything) { toast.error("Marque ao menos um campo para alterar"); return; }
     setBulkBusy(true);
     const list = (data ?? []).filter((p: any) => selected.has(p.id));
+    const m = Number(bulkMarkup || 0);
+    const newPack = Number(bulkPackaging || 0);
+    const newOther = Number(bulkOther || 0);
     let ok = 0, fail = 0;
     for (const p of list) {
       const upd: any = {};
-      chosen.forEach((ch) => {
-        const price = calcPrice(Number(p.cost || 0), Number(p.packaging_cost || 0), Number(p.other_costs || 0), m, ch);
-        if (price != null) {
-          if (ch === "site") { upd.price_site = price; upd.price = price; upd.target_margin = m; }
-          if (ch === "shopee") upd.price_shopee = price;
-          if (ch === "tiktok") upd.price_tiktok = price;
+      if (bulkOn.packaging) upd.packaging_cost = newPack;
+      if (bulkOn.other) upd.other_costs = newOther;
+      if (bulkOn.category) upd.category = bulkCategory || null;
+      if (bulkOn.brand) upd.brand = bulkBrand || null;
+      if (bulkOn.supplier) upd.supplier_id = bulkSupplier || null;
+      if (bulkOn.min_stock && !p.has_variants) upd.min_stock = Number(bulkMinStock || 0);
+      // Recalcula preços com novo custo/embalagem/outros + markup
+      const cost = Number(p.cost || 0);
+      const pack = bulkOn.packaging ? newPack : Number(p.packaging_cost || 0);
+      const other = bulkOn.other ? newOther : Number(p.other_costs || 0);
+      if (bulkOn.markup) {
+        chosen.forEach((ch) => {
+          const price = calcPrice(cost, pack, other, m, ch);
+          if (price != null) {
+            if (ch === "site") { upd.price_site = price; upd.price = price; upd.target_margin = m; }
+            if (ch === "shopee") upd.price_shopee = price;
+            if (ch === "tiktok") upd.price_tiktok = price;
+          }
+        });
+      } else if (bulkOn.packaging || bulkOn.other) {
+        // Mantém markup atual de cada canal e recalcula preços
+        const mkSite = Number(p.target_margin ?? 0);
+        const priceSite = calcPrice(cost, pack, other, mkSite, "site");
+        if (priceSite != null) { upd.price_site = priceSite; upd.price = priceSite; }
+        // Shopee/TikTok: infere markup do preço atual, se houver
+        (["shopee", "tiktok"] as Channel[]).forEach((ch) => {
+          const cur = ch === "shopee" ? p.price_shopee : p.price_tiktok;
+          if (cur != null) {
+            const curMarkup = marginFromPrice(Number(cur), cost, Number(p.packaging_cost || 0), Number(p.other_costs || 0), ch);
+            if (curMarkup != null) {
+              const np = calcPrice(cost, pack, other, curMarkup, ch);
+              if (np != null) upd[`price_${ch}`] = np;
+            }
+          }
+        });
+      }
+      let err: any = null;
+      if (Object.keys(upd).length > 0) {
+        const { error } = await supabase.from("products").update(upd).eq("id", p.id);
+        err = error;
+      }
+      // Estoque (só para produtos sem variantes)
+      if (!err && bulkOn.stock && !p.has_variants) {
+        const target = Number(bulkStock || 0);
+        const oldStock = Number(p.stock ?? 0);
+        const finalStock = bulkStockMode === "set" ? target : oldStock + target;
+        const diff = finalStock - oldStock;
+        if (diff !== 0) {
+          const { error: e2 } = await supabase.from("products").update({ stock: finalStock }).eq("id", p.id);
+          if (!e2) {
+            await supabase.from("stock_movements").insert({
+              product_id: p.id,
+              movement_type: "ajuste",
+              quantity: Math.abs(diff),
+              reason: `Edição em massa (${diff > 0 ? "+" : "−"}${Math.abs(diff)})`,
+            });
+          } else err = e2;
         }
-      });
-      const { error } = await supabase.from("products").update(upd).eq("id", p.id);
-      if (error) fail++; else ok++;
+      }
+      if (err) fail++; else ok++;
     }
     setBulkBusy(false);
     setBulkEditOpen(false);
@@ -335,7 +411,7 @@ function Page() {
             <span className="font-medium">{selected.size} selecionado(s)</span>
             <div className="ml-auto flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={() => setBulkEditOpen(true)} disabled={bulkBusy}>
-                <Pencil className="h-3.5 w-3.5 mr-1" /> Editar preços em massa
+                <Pencil className="h-3.5 w-3.5 mr-1" /> Editar em massa
               </Button>
               <Button size="sm" variant="destructive" onClick={bulkDelete} disabled={bulkBusy}>
                 <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
@@ -442,28 +518,126 @@ function Page() {
       <InvoiceDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <CostHistoryDialog open={!!historyFor} product={historyFor} onClose={() => setHistoryFor(null)} />
       <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Editar preços em massa</DialogTitle></DialogHeader>
-          <div className="space-y-3 text-sm">
-            <p className="text-muted-foreground">Aplicar o markup abaixo a {selected.size} produto(s), recalculando o preço a partir do custo total.</p>
-            <div className="space-y-1.5">
-              <Label>Markup sobre custo (%)</Label>
-              <Input type="number" step="0.1" value={bulkMarkup} onChange={(e) => setBulkMarkup(e.target.value)} />
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Editar em massa · {selected.size} produto(s)</DialogTitle></DialogHeader>
+          <div className="space-y-4 text-sm">
+            <p className="text-muted-foreground text-xs">Marque os campos que deseja alterar. Só o que estiver marcado será aplicado.</p>
+
+            {/* Custos */}
+            <div className="rounded-md border p-3 space-y-3">
+              <div className="font-medium text-xs uppercase text-muted-foreground">Custos</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.packaging} onCheckedChange={(v) => setBulkOn({ ...bulkOn, packaging: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Embalagem (R$)</span>
+                    <Input type="number" step="0.01" value={bulkPackaging} onChange={(e) => setBulkPackaging(e.target.value)} disabled={!bulkOn.packaging} />
+                  </div>
+                </label>
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.other} onCheckedChange={(v) => setBulkOn({ ...bulkOn, other: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Outros custos (R$)</span>
+                    <Input type="number" step="0.01" value={bulkOther} onChange={(e) => setBulkOther(e.target.value)} disabled={!bulkOn.other} />
+                  </div>
+                </label>
+              </div>
+              {(bulkOn.packaging || bulkOn.other) && !bulkOn.markup && (
+                <p className="text-xs text-muted-foreground">Preços serão recalculados mantendo o markup atual de cada canal.</p>
+              )}
             </div>
-            <div className="space-y-1.5">
-              <Label>Canais</Label>
-              <div className="flex flex-wrap gap-3">
-                {(["site", "shopee", "tiktok"] as Channel[]).map((ch) => (
-                  <label key={ch} className="flex items-center gap-1.5 cursor-pointer">
-                    <Checkbox checked={(bulkChannels as any)[ch]} onCheckedChange={(v) => setBulkChannels({ ...bulkChannels, [ch]: Boolean(v) })} />
-                    <span>{CHANNEL_LABEL[ch]}</span>
-                  </label>
-                ))}
+
+            {/* Markup / preços */}
+            <div className="rounded-md border p-3 space-y-3">
+              <label className="flex items-center gap-2 font-medium text-xs uppercase text-muted-foreground">
+                <Checkbox checked={bulkOn.markup} onCheckedChange={(v) => setBulkOn({ ...bulkOn, markup: Boolean(v) })} />
+                Aplicar markup sobre custo
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Markup (%)</Label>
+                  <Input type="number" step="0.1" value={bulkMarkup} onChange={(e) => setBulkMarkup(e.target.value)} disabled={!bulkOn.markup} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Canais</Label>
+                  <div className="flex flex-wrap gap-3 pt-2">
+                    {(["site", "shopee", "tiktok"] as Channel[]).map((ch) => (
+                      <label key={ch} className="flex items-center gap-1.5 cursor-pointer">
+                        <Checkbox checked={(bulkChannels as any)[ch]} disabled={!bulkOn.markup} onCheckedChange={(v) => setBulkChannels({ ...bulkChannels, [ch]: Boolean(v) })} />
+                        <span>{CHANNEL_LABEL[ch]}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* Classificação */}
+            <div className="rounded-md border p-3 space-y-3">
+              <div className="font-medium text-xs uppercase text-muted-foreground">Classificação</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.category} onCheckedChange={(v) => setBulkOn({ ...bulkOn, category: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Categoria</span>
+                    <Input value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} disabled={!bulkOn.category} />
+                  </div>
+                </label>
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.brand} onCheckedChange={(v) => setBulkOn({ ...bulkOn, brand: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Marca</span>
+                    <Input value={bulkBrand} onChange={(e) => setBulkBrand(e.target.value)} disabled={!bulkOn.brand} />
+                  </div>
+                </label>
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.supplier} onCheckedChange={(v) => setBulkOn({ ...bulkOn, supplier: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Fornecedor</span>
+                    <Select value={bulkSupplier} onValueChange={setBulkSupplier} disabled={!bulkOn.supplier}>
+                      <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                      <SelectContent>
+                        {(suppliers ?? []).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Estoque */}
+            <div className="rounded-md border p-3 space-y-3">
+              <div className="font-medium text-xs uppercase text-muted-foreground">Estoque (ignora produtos com variantes)</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.stock} onCheckedChange={(v) => setBulkOn({ ...bulkOn, stock: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Quantidade</span>
+                    <div className="flex gap-2">
+                      <Select value={bulkStockMode} onValueChange={(v) => setBulkStockMode(v as any)} disabled={!bulkOn.stock}>
+                        <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="set">Definir</SelectItem>
+                          <SelectItem value="add">Somar</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input type="number" step="1" value={bulkStock} onChange={(e) => setBulkStock(e.target.value)} disabled={!bulkOn.stock} />
+                    </div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.min_stock} onCheckedChange={(v) => setBulkOn({ ...bulkOn, min_stock: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Estoque mínimo</span>
+                    <Input type="number" step="1" value={bulkMinStock} onChange={(e) => setBulkMinStock(e.target.value)} disabled={!bulkOn.min_stock} />
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setBulkEditOpen(false)}>Cancelar</Button>
-              <Button onClick={bulkApplyMarkup} disabled={bulkBusy} className="bg-gradient-brand text-primary-foreground border-0">
+              <Button onClick={bulkApply} disabled={bulkBusy} className="bg-gradient-brand text-primary-foreground border-0">
                 {bulkBusy ? "Aplicando…" : "Aplicar"}
               </Button>
             </div>
