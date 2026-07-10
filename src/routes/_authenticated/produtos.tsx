@@ -357,10 +357,11 @@ function Page() {
             <TableHead className="text-right">Shopee<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
             <TableHead className="text-right">TikTok<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
             <TableHead>Estoque</TableHead>
+            <TableHead className="text-xs">Datas</TableHead>
             <TableHead></TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
             {filtered.map((p: any) => {
               const variants = p.product_variants ?? [];
               const totalStock = p.has_variants ? variants.reduce((s: number, v: any) => s + (v.stock ?? 0), 0) : p.stock;
@@ -405,6 +406,10 @@ function Page() {
                   <TableCell>{cell(p.price_tiktok, "tiktok")}</TableCell>
                   <TableCell>
                     <Badge variant={low ? "destructive" : "secondary"} className="font-mono">{totalStock}{p.has_variants ? ` (total)` : low ? ` / mín ${p.min_stock}` : ""}</Badge>
+                  </TableCell>
+                  <TableCell className="text-[11px] text-muted-foreground whitespace-nowrap">
+                    <div>Criado: <span className="tabular-nums">{dateBR(p.created_at)}</span></div>
+                    <div>Editado: <span className="tabular-nums">{p.updated_at ? dateBR(p.updated_at) : "—"}</span></div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
