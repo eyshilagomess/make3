@@ -20,9 +20,9 @@ export const searchProductImage = createServerFn({ method: "POST" })
     });
     const html = await tokenRes.text();
     const m =
-      html.match(/vqd=\\?"([^"\\]+)\\?"/) ||
-      html.match(/vqd=([\d-]+)&/) ||
-      html.match(/vqd='([^']+)'/);
+      html.match(/vqd="([^"]+)"/) ||
+      html.match(/vqd='([^']+)'/) ||
+      html.match(/vqd=([\d-]+)/);
     const vqd = m?.[1];
     if (!vqd) return { url: null, candidates: [] };
 
