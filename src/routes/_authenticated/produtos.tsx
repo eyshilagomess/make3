@@ -262,15 +262,38 @@ function Page() {
           </Select>
         </div>
         <Table>
-          <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>SKU</TableHead><TableHead>Custo total</TableHead><TableHead>Site</TableHead><TableHead>Shopee</TableHead><TableHead>TikTok</TableHead><TableHead>Lucro un.</TableHead><TableHead>Margem</TableHead><TableHead>Estoque</TableHead><TableHead></TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow>
+            <TableHead>Produto</TableHead>
+            <TableHead>SKU</TableHead>
+            <TableHead className="text-right">Custo total</TableHead>
+            <TableHead className="text-right">Site<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
+            <TableHead className="text-right">Shopee<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
+            <TableHead className="text-right">TikTok<div className="text-[10px] font-normal text-muted-foreground">preço · lucro · markup</div></TableHead>
+            <TableHead>Estoque</TableHead>
+            <TableHead></TableHead>
+          </TableRow></TableHeader>
           <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
             {filtered.map((p: any) => {
               const variants = p.product_variants ?? [];
               const totalStock = p.has_variants ? variants.reduce((s: number, v: any) => s + (v.stock ?? 0), 0) : p.stock;
               const lowVariant = p.has_variants && variants.some((v: any) => (v.stock ?? 0) <= (v.min_stock ?? 0));
               const low = p.has_variants ? lowVariant : p.stock <= p.min_stock;
               const ct = totalCost(p.cost, p.packaging_cost, p.other_costs);
+              const cell = (price: any, ch: Channel) => {
+                if (price == null) return <div className="text-muted-foreground text-right">—</div>;
+                const pn = Number(price);
+                const receitaLiquida = pn * (1 - CHANNEL_FEES[ch]);
+                const lucro = receitaLiquida - ct;
+                const markup = ct > 0 ? (lucro / ct) * 100 : 0;
+                const color = markup >= 60 ? "text-emerald-600" : markup >= 45 ? "text-amber-600" : "text-destructive";
+                return (
+                  <div className="text-right">
+                    <div className="font-semibold tabular-nums">{brl(pn)}</div>
+                    <div className="text-[10px] text-muted-foreground tabular-nums">{brl(lucro)} · <span className={color}>{markup.toFixed(0)}%</span></div>
+                  </div>
+                );
+              };
               return (
                 <TableRow key={p.id}>
                   <TableCell>
@@ -283,12 +306,13 @@ function Page() {
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{p.sku ?? "—"}</TableCell>
-                  <TableCell className="text-sm">{brl(ct)}<div className="text-[10px] text-muted-foreground">margem {Number(p.target_margin ?? 0)}%</div></TableCell>
-                  <TableCell className="font-semibold">{p.price_site != null ? brl(p.price_site) : "—"}</TableCell>
-                  <TableCell className="font-semibold">{p.price_shopee != null ? brl(p.price_shopee) : "—"}</TableCell>
-                  <TableCell className="font-semibold">{p.price_tiktok != null ? brl(p.price_tiktok) : "—"}</TableCell>
-                  <TableCell className="text-sm tabular-nums">{p.price_site != null ? brl(Number(p.price_site) - ct) : "—"}</TableCell>
-                  <TableCell className="text-sm tabular-nums">{p.price_site != null && Number(p.price_site) > 0 ? `${(((Number(p.price_site) - ct) / Number(p.price_site)) * 100).toFixed(1)}%` : "—"}</TableCell>
+                  <TableCell className="text-right text-sm tabular-nums">
+                    <div className="font-medium">{brl(ct)}</div>
+                    <div className="text-[10px] text-muted-foreground">alvo {Number(p.target_margin ?? 0)}%</div>
+                  </TableCell>
+                  <TableCell>{cell(p.price_site, "site")}</TableCell>
+                  <TableCell>{cell(p.price_shopee, "shopee")}</TableCell>
+                  <TableCell>{cell(p.price_tiktok, "tiktok")}</TableCell>
                   <TableCell>
                     <Badge variant={low ? "destructive" : "secondary"} className="font-mono">{totalStock}{p.has_variants ? ` (total)` : low ? ` / mín ${p.min_stock}` : ""}</Badge>
                   </TableCell>
