@@ -20,12 +20,14 @@ import { Route as AuthenticatedFornecedoresRouteImport } from './routes/_authent
 import { Route as AuthenticatedFechamentoRouteImport } from './routes/_authenticated/fechamento'
 import { Route as AuthenticatedEstoqueRouteImport } from './routes/_authenticated/estoque'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCuponsRouteImport } from './routes/_authenticated/cupons'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
 import { Route as AuthenticatedAlocacaoRouteImport } from './routes/_authenticated/alocacao'
 import { Route as ApiPublicShippingCalculateRouteImport } from './routes/api/public/shipping/calculate'
 import { Route as ApiPublicProductsListRouteImport } from './routes/api/public/products/list'
 import { Route as ApiPublicOrdersCreateRouteImport } from './routes/api/public/orders/create'
 import { Route as ApiPublicInfinitypayWebhookRouteImport } from './routes/api/public/infinitypay/webhook'
+import { Route as ApiPublicCouponsValidateRouteImport } from './routes/api/public/coupons/validate'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -82,6 +84,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCuponsRoute = AuthenticatedCuponsRouteImport.update({
+  id: '/cupons',
+  path: '/cupons',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
   id: '/clientes',
   path: '/clientes',
@@ -114,12 +121,19 @@ const ApiPublicInfinitypayWebhookRoute =
     path: '/api/public/infinitypay/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCouponsValidateRoute =
+  ApiPublicCouponsValidateRouteImport.update({
+    id: '/api/public/coupons/validate',
+    path: '/api/public/coupons/validate',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/alocacao': typeof AuthenticatedAlocacaoRoute
   '/clientes': typeof AuthenticatedClientesRoute
+  '/cupons': typeof AuthenticatedCuponsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/estoque': typeof AuthenticatedEstoqueRoute
   '/fechamento': typeof AuthenticatedFechamentoRoute
@@ -128,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/produtos': typeof AuthenticatedProdutosRoute
   '/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/coupons/validate': typeof ApiPublicCouponsValidateRoute
   '/api/public/infinitypay/webhook': typeof ApiPublicInfinitypayWebhookRoute
   '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
@@ -138,6 +153,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/alocacao': typeof AuthenticatedAlocacaoRoute
   '/clientes': typeof AuthenticatedClientesRoute
+  '/cupons': typeof AuthenticatedCuponsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/estoque': typeof AuthenticatedEstoqueRoute
   '/fechamento': typeof AuthenticatedFechamentoRoute
@@ -146,6 +162,7 @@ export interface FileRoutesByTo {
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/produtos': typeof AuthenticatedProdutosRoute
   '/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/coupons/validate': typeof ApiPublicCouponsValidateRoute
   '/api/public/infinitypay/webhook': typeof ApiPublicInfinitypayWebhookRoute
   '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
@@ -158,6 +175,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/alocacao': typeof AuthenticatedAlocacaoRoute
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
+  '/_authenticated/cupons': typeof AuthenticatedCuponsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/estoque': typeof AuthenticatedEstoqueRoute
   '/_authenticated/fechamento': typeof AuthenticatedFechamentoRoute
@@ -166,6 +184,7 @@ export interface FileRoutesById {
   '/_authenticated/pedidos': typeof AuthenticatedPedidosRoute
   '/_authenticated/produtos': typeof AuthenticatedProdutosRoute
   '/_authenticated/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/coupons/validate': typeof ApiPublicCouponsValidateRoute
   '/api/public/infinitypay/webhook': typeof ApiPublicInfinitypayWebhookRoute
   '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
@@ -178,6 +197,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/alocacao'
     | '/clientes'
+    | '/cupons'
     | '/dashboard'
     | '/estoque'
     | '/fechamento'
@@ -186,6 +206,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/produtos'
     | '/vendas'
+    | '/api/public/coupons/validate'
     | '/api/public/infinitypay/webhook'
     | '/api/public/orders/create'
     | '/api/public/products/list'
@@ -196,6 +217,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/alocacao'
     | '/clientes'
+    | '/cupons'
     | '/dashboard'
     | '/estoque'
     | '/fechamento'
@@ -204,6 +226,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/produtos'
     | '/vendas'
+    | '/api/public/coupons/validate'
     | '/api/public/infinitypay/webhook'
     | '/api/public/orders/create'
     | '/api/public/products/list'
@@ -215,6 +238,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/alocacao'
     | '/_authenticated/clientes'
+    | '/_authenticated/cupons'
     | '/_authenticated/dashboard'
     | '/_authenticated/estoque'
     | '/_authenticated/fechamento'
@@ -223,6 +247,7 @@ export interface FileRouteTypes {
     | '/_authenticated/pedidos'
     | '/_authenticated/produtos'
     | '/_authenticated/vendas'
+    | '/api/public/coupons/validate'
     | '/api/public/infinitypay/webhook'
     | '/api/public/orders/create'
     | '/api/public/products/list'
@@ -233,6 +258,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicCouponsValidateRoute: typeof ApiPublicCouponsValidateRoute
   ApiPublicInfinitypayWebhookRoute: typeof ApiPublicInfinitypayWebhookRoute
   ApiPublicOrdersCreateRoute: typeof ApiPublicOrdersCreateRoute
   ApiPublicProductsListRoute: typeof ApiPublicProductsListRoute
@@ -318,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/cupons': {
+      id: '/_authenticated/cupons'
+      path: '/cupons'
+      fullPath: '/cupons'
+      preLoaderRoute: typeof AuthenticatedCuponsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/clientes': {
       id: '/_authenticated/clientes'
       path: '/clientes'
@@ -360,12 +393,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInfinitypayWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/coupons/validate': {
+      id: '/api/public/coupons/validate'
+      path: '/api/public/coupons/validate'
+      fullPath: '/api/public/coupons/validate'
+      preLoaderRoute: typeof ApiPublicCouponsValidateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAlocacaoRoute: typeof AuthenticatedAlocacaoRoute
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
+  AuthenticatedCuponsRoute: typeof AuthenticatedCuponsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEstoqueRoute: typeof AuthenticatedEstoqueRoute
   AuthenticatedFechamentoRoute: typeof AuthenticatedFechamentoRoute
@@ -379,6 +420,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAlocacaoRoute: AuthenticatedAlocacaoRoute,
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
+  AuthenticatedCuponsRoute: AuthenticatedCuponsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEstoqueRoute: AuthenticatedEstoqueRoute,
   AuthenticatedFechamentoRoute: AuthenticatedFechamentoRoute,
@@ -397,6 +439,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicCouponsValidateRoute: ApiPublicCouponsValidateRoute,
   ApiPublicInfinitypayWebhookRoute: ApiPublicInfinitypayWebhookRoute,
   ApiPublicOrdersCreateRoute: ApiPublicOrdersCreateRoute,
   ApiPublicProductsListRoute: ApiPublicProductsListRoute,
