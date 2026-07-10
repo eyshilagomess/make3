@@ -283,7 +283,7 @@ function Page() {
   const editingProduct = editingId ? (data ?? []).find((p: any) => p.id === editingId) : null;
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-4 lg:p-5 w-full max-w-none">
       <PageHeader title="Produtos" subtitle="Catálogo e controle de estoque"
         actions={
         <div className="flex flex-wrap gap-2">
@@ -310,8 +310,8 @@ function Page() {
         }
       />
 
-      <Card className="p-4 shadow-card">
-        <div className="flex flex-wrap items-center gap-2 mb-4">
+      <Card className="p-2 sm:p-3 shadow-card">
+        <div className="flex flex-wrap items-center gap-2 mb-3">
           <div className="flex items-center gap-2 flex-1 min-w-[220px]">
             <Search className="h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar por nome ou SKU…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
@@ -330,8 +330,26 @@ function Page() {
             </SelectContent>
           </Select>
         </div>
+        {selected.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+            <span className="font-medium">{selected.size} selecionado(s)</span>
+            <div className="ml-auto flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => setBulkEditOpen(true)} disabled={bulkBusy}>
+                <Pencil className="h-3.5 w-3.5 mr-1" /> Editar preços em massa
+              </Button>
+              <Button size="sm" variant="destructive" onClick={bulkDelete} disabled={bulkBusy}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Limpar</Button>
+            </div>
+          </div>
+        )}
+        <div className="overflow-x-auto -mx-2 sm:mx-0">
         <Table>
           <TableHeader><TableRow>
+            <TableHead className="w-8 px-2">
+              <Checkbox checked={allVisibleSelected()} onCheckedChange={(v) => toggleAllVisible(Boolean(v))} />
+            </TableHead>
             <TableHead>Produto</TableHead>
             <TableHead>SKU</TableHead>
             <TableHead className="text-right">Custo total</TableHead>
@@ -342,7 +360,7 @@ function Page() {
             <TableHead></TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
             {filtered.map((p: any) => {
               const variants = p.product_variants ?? [];
               const totalStock = p.has_variants ? variants.reduce((s: number, v: any) => s + (v.stock ?? 0), 0) : p.stock;
@@ -364,7 +382,10 @@ function Page() {
                 );
               };
               return (
-                <TableRow key={p.id}>
+                <TableRow key={p.id} data-state={selected.has(p.id) ? "selected" : undefined}>
+                  <TableCell className="px-2">
+                    <Checkbox checked={selected.has(p.id)} onCheckedChange={(v) => toggleOne(p.id, Boolean(v))} />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       {p.photo_url ? <img src={p.photo_url} alt="" className="h-9 w-9 rounded-md object-cover" /> : <div className="h-9 w-9 rounded-md bg-muted" />}
@@ -408,6 +429,7 @@ function Page() {
             })}
           </TableBody>
         </Table>
+        </div>
       </Card>
 
       <VariantsDialog open={!!variantsFor} product={variantsFor} onClose={() => setVariantsFor(null)} />
