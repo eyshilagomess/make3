@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, Layers, Trash2, Upload, Download, Pencil, Check, X, FileText, Sparkles } from "lucide-react";
 import { History, ImageIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ProductImagesManager } from "@/components/ProductImagesManager";
 import { toast } from "sonner";
 import { brl, dateBR } from "@/lib/format";
 import { calcAllPrices, calcPrice, marginFromPrice, CHANNEL_FEES, CHANNEL_LABEL, totalCost, type Channel } from "@/lib/pricing";
