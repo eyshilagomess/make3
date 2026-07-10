@@ -29,6 +29,26 @@ function categorySlug(category: string | null | undefined) {
   return normalized.replace(/\s+/g, "-");
 }
 
+const LOWER_WORDS = new Set([
+  "de", "da", "do", "das", "dos", "e", "com", "para", "a", "o", "as", "os", "em", "por", "no", "na",
+]);
+
+function toTitleCase(input: string | null | undefined) {
+  if (!input) return input ?? "";
+  return input
+    .toLowerCase()
+    .split(/(\s+|-)/) // preserva espaços e hifens
+    .map((token, idx) => {
+      if (/^\s+$/.test(token) || token === "-") return token;
+      // mantém números e códigos como estão (ex: nº, 08)
+      if (/^\d+$/.test(token)) return token;
+      if (idx > 0 && LOWER_WORDS.has(token)) return token;
+      return token.charAt(0).toUpperCase() + token.slice(1);
+    })
+    .join("")
+    .trim();
+}
+
 export const Route = createFileRoute("/api/public/products/list")({
   server: {
     handlers: {
@@ -61,7 +81,7 @@ export const Route = createFileRoute("/api/public/products/list")({
           const arr = varsByProduct.get(v.product_id) ?? [];
           arr.push({
             id: v.id,
-            name: v.name,
+            name: toTitleCase(v.name),
             sku: v.sku,
             stock: v.stock,
             extra_price: Number(v.extra_price || 0),
@@ -73,7 +93,7 @@ export const Route = createFileRoute("/api/public/products/list")({
           const slug = categorySlug(p.category);
           return {
             id: p.id,
-            name: p.name,
+            name: toTitleCase(p.name),
             sku: p.sku,
             // Compatibilidade com a loja atual: ela usa `category` para produto/kit
             // e filtra páginas /categoria/:slug pelo campo `subcategory`.
