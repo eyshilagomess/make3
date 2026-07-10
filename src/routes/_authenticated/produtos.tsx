@@ -54,6 +54,75 @@ function Page() {
   const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
   const [bulkImgBusy, setBulkImgBusy] = useState(false);
   const searchImgFn = useServerFn(searchProductImage);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkMarkup, setBulkMarkup] = useState("60");
+  const [bulkChannels, setBulkChannels] = useState<{ site: boolean; shopee: boolean; tiktok: boolean }>({ site: true, shopee: false, tiktok: false });
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const toggleOne = (id: string, on: boolean) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (on) n.add(id); else n.delete(id);
+      return n;
+    });
+  };
+
+  const bulkDelete = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`Excluir ${selected.size} produto(s)? Esta ação não pode ser desfeita.`)) return;
+    setBulkBusy(true);
+    const ids = Array.from(selected);
+    try {
+      await supabase.from("product_variants").delete().in("product_id", ids);
+      const { error } = await supabase.from("products").delete().in("id", ids);
+      if (error) throw error;
+      toast.success(`${ids.length} produto(s) excluído(s)`);
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ["products"] });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkBusy(false); }
+  };
+
+  const bulkApplyMarkup = async () => {
+    const m = Number(bulkMarkup || 0);
+    if (!m || selected.size === 0) return;
+    const chosen = (["site", "shopee", "tiktok"] as Channel[]).filter((c) => (bulkChannels as any)[c]);
+    if (chosen.length === 0) { toast.error("Escolha ao menos um canal"); return; }
+    setBulkBusy(true);
+    const list = (data ?? []).filter((p: any) => selected.has(p.id));
+    let ok = 0, fail = 0;
+    for (const p of list) {
+      const upd: any = {};
+      chosen.forEach((ch) => {
+        const price = calcPrice(Number(p.cost || 0), Number(p.packaging_cost || 0), Number(p.other_costs || 0), m, ch);
+        if (price != null) {
+          if (ch === "site") { upd.price_site = price; upd.price = price; upd.target_margin = m; }
+          if (ch === "shopee") upd.price_shopee = price;
+          if (ch === "tiktok") upd.price_tiktok = price;
+        }
+      });
+      const { error } = await supabase.from("products").update(upd).eq("id", p.id);
+      if (error) fail++; else ok++;
+    }
+    setBulkBusy(false);
+    setBulkEditOpen(false);
+    toast.success(`Atualizados: ${ok}${fail ? ` · falhas: ${fail}` : ""}`);
+    qc.invalidateQueries({ queryKey: ["products"] });
+  };
+
+  const allVisibleSelected = () => {
+    const ids = filtered.map((p: any) => p.id);
+    return ids.length > 0 && ids.every((id: string) => selected.has(id));
+  };
+  const toggleAllVisible = (on: boolean) => {
+    const ids = filtered.map((p: any) => p.id);
+    setSelected((prev) => {
+      const n = new Set(prev);
+      ids.forEach((id: string) => on ? n.add(id) : n.delete(id));
+      return n;
+    });
+  };
 
   const fillMissingPhotos = async (onlyMissing = true) => {
     const list = (data ?? []).filter((p: any) => onlyMissing ? !p.photo_url : true);
