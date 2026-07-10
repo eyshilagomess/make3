@@ -54,6 +54,75 @@ function Page() {
   const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
   const [bulkImgBusy, setBulkImgBusy] = useState(false);
   const searchImgFn = useServerFn(searchProductImage);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkMarkup, setBulkMarkup] = useState("60");
+  const [bulkChannels, setBulkChannels] = useState<{ site: boolean; shopee: boolean; tiktok: boolean }>({ site: true, shopee: false, tiktok: false });
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const toggleOne = (id: string, on: boolean) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (on) n.add(id); else n.delete(id);
+      return n;
+    });
+  };
+
+  const bulkDelete = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`Excluir ${selected.size} produto(s)? Esta ação não pode ser desfeita.`)) return;
+    setBulkBusy(true);
+    const ids = Array.from(selected);
+    try {
+      await supabase.from("product_variants").delete().in("product_id", ids);
+      const { error } = await supabase.from("products").delete().in("id", ids);
+      if (error) throw error;
+      toast.success(`${ids.length} produto(s) excluído(s)`);
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ["products"] });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkBusy(false); }
+  };
+
+  const bulkApplyMarkup = async () => {
+    const m = Number(bulkMarkup || 0);
+    if (!m || selected.size === 0) return;
+    const chosen = (["site", "shopee", "tiktok"] as Channel[]).filter((c) => (bulkChannels as any)[c]);
+    if (chosen.length === 0) { toast.error("Escolha ao menos um canal"); return; }
+    setBulkBusy(true);
+    const list = (data ?? []).filter((p: any) => selected.has(p.id));
+    let ok = 0, fail = 0;
+    for (const p of list) {
+      const upd: any = {};
+      chosen.forEach((ch) => {
+        const price = calcPrice(Number(p.cost || 0), Number(p.packaging_cost || 0), Number(p.other_costs || 0), m, ch);
+        if (price != null) {
+          if (ch === "site") { upd.price_site = price; upd.price = price; upd.target_margin = m; }
+          if (ch === "shopee") upd.price_shopee = price;
+          if (ch === "tiktok") upd.price_tiktok = price;
+        }
+      });
+      const { error } = await supabase.from("products").update(upd).eq("id", p.id);
+      if (error) fail++; else ok++;
+    }
+    setBulkBusy(false);
+    setBulkEditOpen(false);
+    toast.success(`Atualizados: ${ok}${fail ? ` · falhas: ${fail}` : ""}`);
+    qc.invalidateQueries({ queryKey: ["products"] });
+  };
+
+  const allVisibleSelected = () => {
+    const ids = filtered.map((p: any) => p.id);
+    return ids.length > 0 && ids.every((id: string) => selected.has(id));
+  };
+  const toggleAllVisible = (on: boolean) => {
+    const ids = filtered.map((p: any) => p.id);
+    setSelected((prev) => {
+      const n = new Set(prev);
+      ids.forEach((id: string) => on ? n.add(id) : n.delete(id));
+      return n;
+    });
+  };
 
   const fillMissingPhotos = async (onlyMissing = true) => {
     const list = (data ?? []).filter((p: any) => onlyMissing ? !p.photo_url : true);
@@ -214,7 +283,7 @@ function Page() {
   const editingProduct = editingId ? (data ?? []).find((p: any) => p.id === editingId) : null;
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-4 lg:p-5 w-full max-w-none">
       <PageHeader title="Produtos" subtitle="Catálogo e controle de estoque"
         actions={
         <div className="flex flex-wrap gap-2">
@@ -241,8 +310,8 @@ function Page() {
         }
       />
 
-      <Card className="p-4 shadow-card">
-        <div className="flex flex-wrap items-center gap-2 mb-4">
+      <Card className="p-2 sm:p-3 shadow-card">
+        <div className="flex flex-wrap items-center gap-2 mb-3">
           <div className="flex items-center gap-2 flex-1 min-w-[220px]">
             <Search className="h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar por nome ou SKU…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
@@ -261,8 +330,26 @@ function Page() {
             </SelectContent>
           </Select>
         </div>
+        {selected.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+            <span className="font-medium">{selected.size} selecionado(s)</span>
+            <div className="ml-auto flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => setBulkEditOpen(true)} disabled={bulkBusy}>
+                <Pencil className="h-3.5 w-3.5 mr-1" /> Editar preços em massa
+              </Button>
+              <Button size="sm" variant="destructive" onClick={bulkDelete} disabled={bulkBusy}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Limpar</Button>
+            </div>
+          </div>
+        )}
+        <div className="overflow-x-auto -mx-2 sm:mx-0">
         <Table>
           <TableHeader><TableRow>
+            <TableHead className="w-8 px-2">
+              <Checkbox checked={allVisibleSelected()} onCheckedChange={(v) => toggleAllVisible(Boolean(v))} />
+            </TableHead>
             <TableHead>Produto</TableHead>
             <TableHead>SKU</TableHead>
             <TableHead className="text-right">Custo total</TableHead>
@@ -273,7 +360,7 @@ function Page() {
             <TableHead></TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-12">Nenhum produto cadastrado.</TableCell></TableRow>}
             {filtered.map((p: any) => {
               const variants = p.product_variants ?? [];
               const totalStock = p.has_variants ? variants.reduce((s: number, v: any) => s + (v.stock ?? 0), 0) : p.stock;
@@ -295,7 +382,10 @@ function Page() {
                 );
               };
               return (
-                <TableRow key={p.id}>
+                <TableRow key={p.id} data-state={selected.has(p.id) ? "selected" : undefined}>
+                  <TableCell className="px-2">
+                    <Checkbox checked={selected.has(p.id)} onCheckedChange={(v) => toggleOne(p.id, Boolean(v))} />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       {p.photo_url ? <img src={p.photo_url} alt="" className="h-9 w-9 rounded-md object-cover" /> : <div className="h-9 w-9 rounded-md bg-muted" />}
@@ -339,12 +429,42 @@ function Page() {
             })}
           </TableBody>
         </Table>
+        </div>
       </Card>
 
       <VariantsDialog open={!!variantsFor} product={variantsFor} onClose={() => setVariantsFor(null)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <InvoiceDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <CostHistoryDialog open={!!historyFor} product={historyFor} onClose={() => setHistoryFor(null)} />
+      <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Editar preços em massa</DialogTitle></DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">Aplicar o markup abaixo a {selected.size} produto(s), recalculando o preço a partir do custo total.</p>
+            <div className="space-y-1.5">
+              <Label>Markup sobre custo (%)</Label>
+              <Input type="number" step="0.1" value={bulkMarkup} onChange={(e) => setBulkMarkup(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Canais</Label>
+              <div className="flex flex-wrap gap-3">
+                {(["site", "shopee", "tiktok"] as Channel[]).map((ch) => (
+                  <label key={ch} className="flex items-center gap-1.5 cursor-pointer">
+                    <Checkbox checked={(bulkChannels as any)[ch]} onCheckedChange={(v) => setBulkChannels({ ...bulkChannels, [ch]: Boolean(v) })} />
+                    <span>{CHANNEL_LABEL[ch]}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setBulkEditOpen(false)}>Cancelar</Button>
+              <Button onClick={bulkApplyMarkup} disabled={bulkBusy} className="bg-gradient-brand text-primary-foreground border-0">
+                {bulkBusy ? "Aplicando…" : "Aplicar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={!!editingId} onOpenChange={(v) => !v && (setEditingId(null), setForm(empty))}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Editar produto {editingProduct?.name ? `— ${editingProduct.name}` : ""}</DialogTitle></DialogHeader>
