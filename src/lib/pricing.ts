@@ -34,7 +34,6 @@ export function totalCost(cost: number, packaging: number, other: number) {
  * Fórmula:   preço         = custo_total / (1 − comissão − margem)
  *
  * Ex.: custo R$10, comissão 4%, margem 30% → preço = 10 / (1 - 0,04 - 0,30) = R$15,15
- * Limite: margem precisa ser < (1 − comissão). Ex.: no Site (4%) máximo 95%.
  */
 export function calcPrice(cost: number, packaging: number, other: number, marginPct: number, channel: Channel): number | null {
   const ct = totalCost(cost, packaging, other);
