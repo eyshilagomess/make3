@@ -59,6 +59,7 @@ const emptyForm: FormState = {
 function Page() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const notifyEvent = useServerFn(notifyOrderEvent);
   const [range, setRange] = useState<DateRange>(() => rangeFromPreset(DEFAULT_PRESET));
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
