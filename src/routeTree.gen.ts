@@ -27,6 +27,7 @@ import { Route as AuthenticatedAlocacaoRouteImport } from './routes/_authenticat
 import { Route as ApiPublicShippingCalculateRouteImport } from './routes/api/public/shipping/calculate'
 import { Route as ApiPublicProductsListRouteImport } from './routes/api/public/products/list'
 import { Route as ApiPublicOrdersCreateRouteImport } from './routes/api/public/orders/create'
+import { Route as ApiPublicMelhorenvioWebhookRouteImport } from './routes/api/public/melhorenvio/webhook'
 import { Route as ApiPublicInfinitypayWebhookRouteImport } from './routes/api/public/infinitypay/webhook'
 import { Route as ApiPublicCouponsValidateRouteImport } from './routes/api/public/coupons/validate'
 
@@ -122,6 +123,12 @@ const ApiPublicOrdersCreateRoute = ApiPublicOrdersCreateRouteImport.update({
   path: '/api/public/orders/create',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicMelhorenvioWebhookRoute =
+  ApiPublicMelhorenvioWebhookRouteImport.update({
+    id: '/api/public/melhorenvio/webhook',
+    path: '/api/public/melhorenvio/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicInfinitypayWebhookRoute =
   ApiPublicInfinitypayWebhookRouteImport.update({
     id: '/api/public/infinitypay/webhook',
@@ -152,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/vendas': typeof AuthenticatedVendasRoute
   '/api/public/coupons/validate': typeof ApiPublicCouponsValidateRoute
   '/api/public/infinitypay/webhook': typeof ApiPublicInfinitypayWebhookRoute
+  '/api/public/melhorenvio/webhook': typeof ApiPublicMelhorenvioWebhookRoute
   '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
   '/api/public/shipping/calculate': typeof ApiPublicShippingCalculateRoute
@@ -173,6 +181,7 @@ export interface FileRoutesByTo {
   '/vendas': typeof AuthenticatedVendasRoute
   '/api/public/coupons/validate': typeof ApiPublicCouponsValidateRoute
   '/api/public/infinitypay/webhook': typeof ApiPublicInfinitypayWebhookRoute
+  '/api/public/melhorenvio/webhook': typeof ApiPublicMelhorenvioWebhookRoute
   '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
   '/api/public/shipping/calculate': typeof ApiPublicShippingCalculateRoute
@@ -196,6 +205,7 @@ export interface FileRoutesById {
   '/_authenticated/vendas': typeof AuthenticatedVendasRoute
   '/api/public/coupons/validate': typeof ApiPublicCouponsValidateRoute
   '/api/public/infinitypay/webhook': typeof ApiPublicInfinitypayWebhookRoute
+  '/api/public/melhorenvio/webhook': typeof ApiPublicMelhorenvioWebhookRoute
   '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
   '/api/public/shipping/calculate': typeof ApiPublicShippingCalculateRoute
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/vendas'
     | '/api/public/coupons/validate'
     | '/api/public/infinitypay/webhook'
+    | '/api/public/melhorenvio/webhook'
     | '/api/public/orders/create'
     | '/api/public/products/list'
     | '/api/public/shipping/calculate'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/vendas'
     | '/api/public/coupons/validate'
     | '/api/public/infinitypay/webhook'
+    | '/api/public/melhorenvio/webhook'
     | '/api/public/orders/create'
     | '/api/public/products/list'
     | '/api/public/shipping/calculate'
@@ -262,6 +274,7 @@ export interface FileRouteTypes {
     | '/_authenticated/vendas'
     | '/api/public/coupons/validate'
     | '/api/public/infinitypay/webhook'
+    | '/api/public/melhorenvio/webhook'
     | '/api/public/orders/create'
     | '/api/public/products/list'
     | '/api/public/shipping/calculate'
@@ -273,6 +286,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ApiPublicCouponsValidateRoute: typeof ApiPublicCouponsValidateRoute
   ApiPublicInfinitypayWebhookRoute: typeof ApiPublicInfinitypayWebhookRoute
+  ApiPublicMelhorenvioWebhookRoute: typeof ApiPublicMelhorenvioWebhookRoute
   ApiPublicOrdersCreateRoute: typeof ApiPublicOrdersCreateRoute
   ApiPublicProductsListRoute: typeof ApiPublicProductsListRoute
   ApiPublicShippingCalculateRoute: typeof ApiPublicShippingCalculateRoute
@@ -406,6 +420,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicOrdersCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/melhorenvio/webhook': {
+      id: '/api/public/melhorenvio/webhook'
+      path: '/api/public/melhorenvio/webhook'
+      fullPath: '/api/public/melhorenvio/webhook'
+      preLoaderRoute: typeof ApiPublicMelhorenvioWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/infinitypay/webhook': {
       id: '/api/public/infinitypay/webhook'
       path: '/api/public/infinitypay/webhook'
@@ -463,6 +484,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ApiPublicCouponsValidateRoute: ApiPublicCouponsValidateRoute,
   ApiPublicInfinitypayWebhookRoute: ApiPublicInfinitypayWebhookRoute,
+  ApiPublicMelhorenvioWebhookRoute: ApiPublicMelhorenvioWebhookRoute,
   ApiPublicOrdersCreateRoute: ApiPublicOrdersCreateRoute,
   ApiPublicProductsListRoute: ApiPublicProductsListRoute,
   ApiPublicShippingCalculateRoute: ApiPublicShippingCalculateRoute,
@@ -470,13 +492,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
