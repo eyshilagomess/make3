@@ -16,9 +16,13 @@ export const extractFromImage = createServerFn({ method: "POST" })
 
     const systemInvoice = `Você extrai itens de uma nota fiscal/cupom de compra de fornecedor.
 Retorne APENAS JSON válido no formato:
-{"items":[{"name":"string","sku":"string|null","quantity":number,"unit_cost":number,"category":"string|null","brand":"string|null"}]}
-- unit_cost = preço unitário de custo em reais.
-- Não invente itens. Se algo for ilegível, ignore.`;
+{"items":[{"name":"string","sku":"string|null","quantity":number,"unit_cost":number,"unit_gross":number|null,"unit_discount":number|null,"category":"string|null","brand":"string|null"}]}
+- unit_gross = preço unitário BRUTO (antes de qualquer desconto), em reais.
+- unit_discount = valor do desconto POR UNIDADE, em reais (se a nota mostrar desconto por item ou desconto total do item, divida pela quantidade). Use 0 quando não houver.
+- unit_cost = preço unitário LÍQUIDO realmente pago = unit_gross - unit_discount. SEMPRE calcule já com o desconto aplicado, mesmo que a nota mostre o desconto separado em outra coluna/linha.
+- Se houver desconto exibido apenas como total do item (ex: "Desc. R$ 3,00" para quantidade 2), divida pela quantidade antes de subtrair.
+- Se a nota exibir somente o valor líquido, use unit_cost = valor líquido, unit_gross = mesmo valor, unit_discount = 0.
+- Todos os valores em reais, com ponto decimal. Não invente itens. Se algo for ilegível, ignore.`;
 
     const systemReceipt = `Você lê um recibo/comprovante de despesa.
 Retorne APENAS JSON válido:
