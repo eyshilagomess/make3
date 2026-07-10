@@ -421,6 +421,12 @@ function Page() {
               <Button size="sm" variant="outline" onClick={() => setBulkEditOpen(true)} disabled={bulkBusy}>
                 <Pencil className="h-3.5 w-3.5 mr-1" /> Editar em massa
               </Button>
+              <Button size="sm" variant="outline" onClick={() => bulkFetchImages(true)} disabled={bulkImgBusy || bulkBusy}>
+                <ImageIcon className="h-3.5 w-3.5 mr-1" /> {bulkImgBusy ? "Buscando…" : "Buscar imagens (faltando)"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => bulkFetchImages(false)} disabled={bulkImgBusy || bulkBusy}>
+                <ImageIcon className="h-3.5 w-3.5 mr-1" /> Substituir imagens
+              </Button>
               <Button size="sm" variant="destructive" onClick={bulkDelete} disabled={bulkBusy}>
                 <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
               </Button>
