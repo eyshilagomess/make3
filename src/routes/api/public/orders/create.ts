@@ -136,7 +136,7 @@ export const Route = createFileRoute("/api/public/orders/create")({
           .from("orders")
           .insert({
             customer_id,
-            channel: "woocommerce",
+            channel: "site",
             source: "site",
             status: "pendente",
             payment_status: "pendente",
