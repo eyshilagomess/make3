@@ -46,18 +46,22 @@ export const Route = createFileRoute("/api/public/infinitypay/webhook")({
         const refused = status.includes("refused") || status.includes("failed") || status.includes("cancel");
 
         if (approved) {
+          const method =
+            event.method === "pix" ? "pix"
+            : event.method === "debito" ? "cartao_debito"
+            : "cartao_credito";
           await supabaseAdmin
             .from("orders")
             .update({
-              payment_status: "pago",
-              payment_method: event.method === "pix" ? "pix" : event.method === "debito" ? "debito" : "credito",
-              status: "concluido",
+              payment_status: "confirmado" as any,
+              payment_method: method as any,
+              status: "entregue" as any,
             })
             .eq("id", order.id);
         } else if (refused) {
           await supabaseAdmin
             .from("orders")
-            .update({ payment_status: "cancelado", status: "cancelado" })
+            .update({ payment_status: "estornado" as any, status: "cancelado" as any })
             .eq("id", order.id);
         }
 

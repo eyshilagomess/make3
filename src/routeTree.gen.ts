@@ -25,6 +25,7 @@ import { Route as AuthenticatedAlocacaoRouteImport } from './routes/_authenticat
 import { Route as ApiPublicShippingCalculateRouteImport } from './routes/api/public/shipping/calculate'
 import { Route as ApiPublicProductsListRouteImport } from './routes/api/public/products/list'
 import { Route as ApiPublicOrdersCreateRouteImport } from './routes/api/public/orders/create'
+import { Route as ApiPublicInfinitypayWebhookRouteImport } from './routes/api/public/infinitypay/webhook'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -107,6 +108,12 @@ const ApiPublicOrdersCreateRoute = ApiPublicOrdersCreateRouteImport.update({
   path: '/api/public/orders/create',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicInfinitypayWebhookRoute =
+  ApiPublicInfinitypayWebhookRouteImport.update({
+    id: '/api/public/infinitypay/webhook',
+    path: '/api/public/infinitypay/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/produtos': typeof AuthenticatedProdutosRoute
   '/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/infinitypay/webhook': typeof ApiPublicInfinitypayWebhookRoute
   '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
   '/api/public/shipping/calculate': typeof ApiPublicShippingCalculateRoute
@@ -138,6 +146,7 @@ export interface FileRoutesByTo {
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/produtos': typeof AuthenticatedProdutosRoute
   '/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/infinitypay/webhook': typeof ApiPublicInfinitypayWebhookRoute
   '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
   '/api/public/shipping/calculate': typeof ApiPublicShippingCalculateRoute
@@ -157,6 +166,7 @@ export interface FileRoutesById {
   '/_authenticated/pedidos': typeof AuthenticatedPedidosRoute
   '/_authenticated/produtos': typeof AuthenticatedProdutosRoute
   '/_authenticated/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/infinitypay/webhook': typeof ApiPublicInfinitypayWebhookRoute
   '/api/public/orders/create': typeof ApiPublicOrdersCreateRoute
   '/api/public/products/list': typeof ApiPublicProductsListRoute
   '/api/public/shipping/calculate': typeof ApiPublicShippingCalculateRoute
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/produtos'
     | '/vendas'
+    | '/api/public/infinitypay/webhook'
     | '/api/public/orders/create'
     | '/api/public/products/list'
     | '/api/public/shipping/calculate'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/produtos'
     | '/vendas'
+    | '/api/public/infinitypay/webhook'
     | '/api/public/orders/create'
     | '/api/public/products/list'
     | '/api/public/shipping/calculate'
@@ -211,6 +223,7 @@ export interface FileRouteTypes {
     | '/_authenticated/pedidos'
     | '/_authenticated/produtos'
     | '/_authenticated/vendas'
+    | '/api/public/infinitypay/webhook'
     | '/api/public/orders/create'
     | '/api/public/products/list'
     | '/api/public/shipping/calculate'
@@ -220,6 +233,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicInfinitypayWebhookRoute: typeof ApiPublicInfinitypayWebhookRoute
   ApiPublicOrdersCreateRoute: typeof ApiPublicOrdersCreateRoute
   ApiPublicProductsListRoute: typeof ApiPublicProductsListRoute
   ApiPublicShippingCalculateRoute: typeof ApiPublicShippingCalculateRoute
@@ -339,6 +353,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicOrdersCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/infinitypay/webhook': {
+      id: '/api/public/infinitypay/webhook'
+      path: '/api/public/infinitypay/webhook'
+      fullPath: '/api/public/infinitypay/webhook'
+      preLoaderRoute: typeof ApiPublicInfinitypayWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -376,6 +397,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicInfinitypayWebhookRoute: ApiPublicInfinitypayWebhookRoute,
   ApiPublicOrdersCreateRoute: ApiPublicOrdersCreateRoute,
   ApiPublicProductsListRoute: ApiPublicProductsListRoute,
   ApiPublicShippingCalculateRoute: ApiPublicShippingCalculateRoute,
