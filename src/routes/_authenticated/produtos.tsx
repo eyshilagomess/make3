@@ -669,9 +669,14 @@ function Page() {
         </DialogContent>
       </Dialog>
       <Dialog open={!!editingId} onOpenChange={(v) => !v && (setEditingId(null), setForm(empty))}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Editar produto {editingProduct?.name ? `— ${editingProduct.name}` : ""}</DialogTitle></DialogHeader>
           {editingProduct && (
+            <>
+            <div className="mb-4 border rounded-md p-3 bg-muted/30">
+              <div className="text-sm font-medium mb-2">Galeria de imagens (até 5)</div>
+              <ProductImagesManager productId={editingProduct.id} />
+            </div>
             <ProductForm
               form={form} setForm={setForm} suppliers={suppliers ?? []}
               submitting={update.isPending} submitLabel="Atualizar"
@@ -679,6 +684,7 @@ function Page() {
               onCancel={() => { setEditingId(null); setForm(empty); }}
               onSubmit={() => update.mutate({ id: editingId!, f: form, oldStock: Number(editingProduct.stock ?? 0) })}
             />
+            </>
           )}
         </DialogContent>
       </Dialog>
