@@ -22,6 +22,7 @@ import { Route as AuthenticatedEstoqueRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
 import { Route as AuthenticatedAlocacaoRouteImport } from './routes/_authenticated/alocacao'
+import { Route as ApiPublicShippingCalculateRouteImport } from './routes/api/public/shipping/calculate'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -88,6 +89,12 @@ const AuthenticatedAlocacaoRoute = AuthenticatedAlocacaoRouteImport.update({
   path: '/alocacao',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const ApiPublicShippingCalculateRoute =
+  ApiPublicShippingCalculateRouteImport.update({
+    id: '/api/public/shipping/calculate',
+    path: '/api/public/shipping/calculate',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/produtos': typeof AuthenticatedProdutosRoute
   '/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/shipping/calculate': typeof ApiPublicShippingCalculateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -116,6 +124,7 @@ export interface FileRoutesByTo {
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/produtos': typeof AuthenticatedProdutosRoute
   '/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/shipping/calculate': typeof ApiPublicShippingCalculateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -132,6 +141,7 @@ export interface FileRoutesById {
   '/_authenticated/pedidos': typeof AuthenticatedPedidosRoute
   '/_authenticated/produtos': typeof AuthenticatedProdutosRoute
   '/_authenticated/vendas': typeof AuthenticatedVendasRoute
+  '/api/public/shipping/calculate': typeof ApiPublicShippingCalculateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/produtos'
     | '/vendas'
+    | '/api/public/shipping/calculate'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/pedidos'
     | '/produtos'
     | '/vendas'
+    | '/api/public/shipping/calculate'
   id:
     | '__root__'
     | '/'
@@ -177,12 +189,14 @@ export interface FileRouteTypes {
     | '/_authenticated/pedidos'
     | '/_authenticated/produtos'
     | '/_authenticated/vendas'
+    | '/api/public/shipping/calculate'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicShippingCalculateRoute: typeof ApiPublicShippingCalculateRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -278,6 +292,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAlocacaoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/api/public/shipping/calculate': {
+      id: '/api/public/shipping/calculate'
+      path: '/api/public/shipping/calculate'
+      fullPath: '/api/public/shipping/calculate'
+      preLoaderRoute: typeof ApiPublicShippingCalculateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -315,6 +336,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicShippingCalculateRoute: ApiPublicShippingCalculateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
