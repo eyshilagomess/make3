@@ -370,41 +370,41 @@ function ProductForm({
   submitting: boolean; submitLabel: string; stockEditable: boolean;
   onCancel: () => void; onSubmit: () => void;
 }) {
-  // Quando custos ou margem mudam, recalcula os 3 preços.
-  const recalcFromMargin = (f: Form, marginStr: string): Form => {
-    const c = Number(f.cost || 0), pk = Number(f.packaging_cost || 0), o = Number(f.other_costs || 0);
-    const m = Number(marginStr || 0);
-    const prices = calcAllPrices(c, pk, o, m);
-    return {
-      ...f, target_margin: marginStr,
-      price_site: prices.site != null ? String(prices.site) : "",
-      price_shopee: prices.shopee != null ? String(prices.shopee) : "",
-      price_tiktok: prices.tiktok != null ? String(prices.tiktok) : "",
-    };
+  // Cada canal tem markup INDEPENDENTE. Editar preço/markup de um canal
+  // NÃO altera os outros — o lojista escolhe estratégia por plataforma.
+  const priceKey = (ch: Channel) => (ch === "site" ? "price_site" : ch === "shopee" ? "price_shopee" : "price_tiktok") as "price_site" | "price_shopee" | "price_tiktok";
+
+  const onChannelMarginChange = (ch: Channel, marginStr: string) => {
+    const c = Number(form.cost || 0), pk = Number(form.packaging_cost || 0), o = Number(form.other_costs || 0);
+    const p = calcPrice(c, pk, o, Number(marginStr || 0), ch);
+    const next: Form = { ...form, [priceKey(ch)]: p != null ? String(p) : "" } as Form;
+    if (ch === "site") next.target_margin = marginStr;
+    setForm(next);
   };
 
-  // Quando o usuário digita um preço de canal, recalcula a margem implícita
-  // e atualiza os preços dos OUTROS canais usando essa nova margem.
-  const onPriceChange = (channel: Channel, value: string) => {
-    const next: Form = { ...form, [`price_${channel}`]: value } as Form;
-    const price = Number(value || 0);
-    if (price > 0) {
+  const onPriceChange = (ch: Channel, value: string) => {
+    const next: Form = { ...form, [priceKey(ch)]: value } as Form;
+    if (ch === "site") {
       const c = Number(form.cost || 0), pk = Number(form.packaging_cost || 0), o = Number(form.other_costs || 0);
-      const m = marginFromPrice(price, c, pk, o, channel);
-      if (m != null) {
-        next.target_margin = String(m);
-        (["site", "shopee", "tiktok"] as Channel[]).forEach((ch) => {
-          if (ch === channel) return;
-          const p = calcPrice(c, pk, o, m, ch);
-          (next as any)[`price_${ch}`] = p != null ? String(p) : "";
-        });
-      }
+      const m = marginFromPrice(Number(value || 0), c, pk, o, "site");
+      if (m != null) next.target_margin = String(m);
     }
     setForm(next);
   };
 
+  // Ao mexer nos custos, mantém o markup de cada canal e recalcula seus preços.
   const onCostChange = (key: "cost" | "packaging_cost" | "other_costs", value: string) => {
-    setForm(recalcFromMargin({ ...form, [key]: value }, form.target_margin));
+    const nc = { ...form, [key]: value };
+    const c = Number(nc.cost || 0), pk = Number(nc.packaging_cost || 0), o = Number(nc.other_costs || 0);
+    const next: Form = { ...nc } as Form;
+    (["site", "shopee", "tiktok"] as Channel[]).forEach((ch) => {
+      const currentPrice = Number((form as any)[priceKey(ch)] || 0);
+      const oldC = Number(form.cost || 0), oldPk = Number(form.packaging_cost || 0), oldO = Number(form.other_costs || 0);
+      const m = currentPrice > 0 ? marginFromPrice(currentPrice, oldC, oldPk, oldO, ch) : Number(form.target_margin || 0);
+      const p = calcPrice(c, pk, o, m ?? 0, ch);
+      (next as any)[priceKey(ch)] = p != null ? String(p) : "";
+    });
+    setForm(next);
   };
 
   const ct = totalCost(Number(form.cost || 0), Number(form.packaging_cost || 0), Number(form.other_costs || 0));
@@ -480,7 +480,7 @@ function ProductForm({
       <div className="space-y-1.5"><Label>Custo (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={(e) => onCostChange("cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Embalagem (R$)</Label><Input type="number" step="0.01" value={form.packaging_cost} onChange={(e) => onCostChange("packaging_cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Outros custos (R$)</Label><Input type="number" step="0.01" value={form.other_costs} onChange={(e) => onCostChange("other_costs", e.target.value)} placeholder="Ex: brinde, etiqueta…" /></div>
-      <div className="space-y-1.5"><Label>Markup sobre custo (%)</Label><Input type="number" step="0.1" value={form.target_margin} onChange={(e) => setForm(recalcFromMargin(form, e.target.value))} /><p className="text-[10px] text-muted-foreground">Lucro líquido ÷ custo total. Ex.: 60% = R$0,60 de lucro para cada R$1,00 de custo.</p></div>
+      <div className="space-y-1.5"><Label>Markup alvo padrão (%)</Label><Input type="number" step="0.1" value={form.target_margin} onChange={(e) => setForm({ ...form, target_margin: e.target.value })} /><p className="text-[10px] text-muted-foreground">Referência exibida na lista. Cada canal abaixo tem markup próprio.</p></div>
 
       <div className="col-span-2 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
         <div className="flex items-center justify-between text-xs">
@@ -502,18 +502,32 @@ function ProductForm({
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex justify-between">
                   <span>{CHANNEL_LABEL[ch]}</span><span>comissão {(feePct * 100).toFixed(0)}%</span>
                 </div>
-                <Input
-                  type="number" step="0.01" className="h-8 font-semibold"
-                  value={raw}
-                  onChange={(e) => onPriceChange(ch, e.target.value)}
-                  placeholder="0,00"
-                />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground w-10">Preço</span>
+                    <Input
+                      type="number" step="0.01" className="h-7 font-semibold"
+                      value={raw}
+                      onChange={(e) => onPriceChange(ch, e.target.value)}
+                      placeholder="0,00"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground w-10">Markup</span>
+                    <Input
+                      type="number" step="0.1" className="h-7"
+                      value={ct > 0 && price > 0 ? markup.toFixed(1) : ""}
+                      onChange={(e) => onChannelMarginChange(ch, e.target.value)}
+                      placeholder="%"
+                    />
+                    <span className="text-[10px] text-muted-foreground">%</span>
+                  </div>
+                </div>
                 {price > 0 && (
                   <div className="text-[10px] space-y-0.5 tabular-nums">
                     <div className="flex justify-between text-muted-foreground"><span>− comissão</span><span>{brl(feeAmt)}</span></div>
                     <div className="flex justify-between text-muted-foreground"><span>− custo</span><span>{brl(ct)}</span></div>
                     <div className="flex justify-between font-semibold"><span>= lucro</span><span className={color}>{brl(lucro)}</span></div>
-                    <div className={`flex justify-between ${color}`}><span>markup</span><span>{markup.toFixed(1)}%</span></div>
                   </div>
                 )}
               </div>
@@ -521,9 +535,8 @@ function ProductForm({
           })}
         </div>
         <p className="text-[10px] text-muted-foreground">
-          <strong>Markup</strong> = lucro líquido ÷ custo. Ex.: R$1,00 de custo com markup 60% = R$0,60 de lucro depois da comissão.
-          Mexa no markup ou digite o preço final — o outro lado é recalculado automaticamente.
-          <span className="block mt-1">Verde ≥ 60% (ideal) · amarelo 45–60% (aceitável) · vermelho &lt; 45% (revisar).</span>
+          <strong>Cada canal é independente</strong> — mudar preço ou markup em um NÃO afeta os outros.
+          Markup = lucro líquido ÷ custo. Verde ≥ 60% · amarelo 45–60% · vermelho &lt; 45%.
         </p>
       </div>
 
