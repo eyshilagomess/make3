@@ -183,6 +183,40 @@ export const Route = createFileRoute("/api/public/orders/create")({
           });
         }
 
+        // Fire notifications & emails (best-effort, never block the response)
+        try {
+          const notify = await import("@/lib/notify.server");
+          const info = {
+            order_code: order.order_code,
+            channel: "site",
+            total,
+            customer_name: body.customer.name,
+            customer_email: email,
+            items: orderItems.map((i) => ({
+              product_name: i.product_name,
+              variant_name: i.variant_name,
+              quantity: i.quantity,
+              unit_price: i.unit_price,
+            })),
+          };
+          const to = [process.env.MAIL_OWNER, process.env.MAIL_STORE].filter((x): x is string => !!x);
+          if (to.length) {
+            await notify.sendEmail({
+              to,
+              subject: `🛒 Novo pedido no site ${order.order_code ?? ""} — ${body.customer.name}`,
+              html: notify.renderOwnerNewOrderEmail(info),
+            });
+          }
+          await notify.notify({
+            type: "order_created",
+            title: `Novo pedido site ${order.order_code ?? ""}`,
+            message: `${body.customer.name} · R$ ${total.toFixed(2)}`,
+            data: { order_id: order.id },
+          });
+        } catch (e) {
+          console.error("[orders/create] notify failed", e);
+        }
+
         return json({ order_id: order.id, order_code: order.order_code, total });
       },
     },
