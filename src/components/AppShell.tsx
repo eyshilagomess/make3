@@ -1,14 +1,16 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, ShoppingBag, Package, Users, Truck, Boxes, LogOut, BarChart3, Menu, Receipt, PiggyBank, CalendarCheck, Tag } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Package, Users, Truck, Boxes, LogOut, BarChart3, Menu, Receipt, PiggyBank, CalendarCheck, Tag, Globe } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { NotificationBell } from "@/components/NotificationBell";
 import logo from "@/assets/make3-logo.jpg";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/pedidos", label: "Pedidos", icon: ShoppingBag },
+  { to: "/pedidos-site", label: "Pedidos Site", icon: Globe },
   { to: "/vendas", label: "Vendas", icon: BarChart3 },
   { to: "/produtos", label: "Produtos", icon: Package },
   { to: "/estoque", label: "Movimentações", icon: Boxes },
@@ -75,9 +77,12 @@ export function AppShell() {
           </SheetContent>
         </Sheet>
         <img src={logo} alt="Make 3" className="h-9 w-auto rounded-md" />
-        <div className="w-9" />
+        <NotificationBell />
       </header>
       <main className="flex-1 overflow-auto pt-14 md:pt-0">
+        <div className="hidden md:flex justify-end px-4 pt-3">
+          <NotificationBell />
+        </div>
         <Outlet />
       </main>
     </div>
