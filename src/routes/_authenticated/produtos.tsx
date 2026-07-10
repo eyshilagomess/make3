@@ -200,8 +200,11 @@ function Page() {
     });
   };
 
-  const fillMissingPhotos = async (onlyMissing = true) => {
-    const list = (data ?? []).filter((p: any) => onlyMissing ? !p.photo_url : true);
+  const fillMissingPhotos = async (onlyMissing = true, ids?: Set<string>) => {
+    const base = ids && ids.size > 0
+      ? (data ?? []).filter((p: any) => ids.has(p.id))
+      : (data ?? []);
+    const list = base.filter((p: any) => onlyMissing ? !p.photo_url : true);
     if (list.length === 0) { toast.info("Nada a preencher"); return; }
     if (!confirm(`Buscar imagens para ${list.length} produto(s)? Você pode alterar depois.`)) return;
     setBulkImgBusy(true);
@@ -223,6 +226,11 @@ function Page() {
     toast.success(`Concluído: ${ok} preenchidas, ${fail} sem resultado`, { id: t });
     setBulkImgBusy(false);
     qc.invalidateQueries({ queryKey: ["products"] });
+  };
+
+  const bulkFetchImages = async (onlyMissing: boolean) => {
+    if (selected.size === 0) return;
+    await fillMissingPhotos(onlyMissing, selected);
   };
 
   const { data } = useQuery({
@@ -412,6 +420,12 @@ function Page() {
             <div className="ml-auto flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={() => setBulkEditOpen(true)} disabled={bulkBusy}>
                 <Pencil className="h-3.5 w-3.5 mr-1" /> Editar em massa
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => bulkFetchImages(true)} disabled={bulkImgBusy || bulkBusy}>
+                <ImageIcon className="h-3.5 w-3.5 mr-1" /> {bulkImgBusy ? "Buscando…" : "Buscar imagens (faltando)"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => bulkFetchImages(false)} disabled={bulkImgBusy || bulkBusy}>
+                <ImageIcon className="h-3.5 w-3.5 mr-1" /> Substituir imagens
               </Button>
               <Button size="sm" variant="destructive" onClick={bulkDelete} disabled={bulkBusy}>
                 <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
