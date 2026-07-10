@@ -75,6 +75,18 @@ export const Route = createFileRoute("/api/public/products/list")({
           .select("id, product_id, name, sku, stock, extra_price, status")
           .in("product_id", productIds.length ? productIds : ["00000000-0000-0000-0000-000000000000"]);
 
+        const { data: imgs } = await supabaseAdmin
+          .from("product_images")
+          .select("product_id, url, position, is_primary")
+          .in("product_id", productIds.length ? productIds : ["00000000-0000-0000-0000-000000000000"])
+          .order("position", { ascending: true });
+        const imgsByProduct = new Map<string, string[]>();
+        for (const i of imgs ?? []) {
+          const arr = imgsByProduct.get(i.product_id) ?? [];
+          arr.push(i.url);
+          imgsByProduct.set(i.product_id, arr);
+        }
+
         const varsByProduct = new Map<string, any[]>();
         for (const v of variants ?? []) {
           if (v.status !== "ativo") continue;
@@ -104,7 +116,8 @@ export const Route = createFileRoute("/api/public/products/list")({
             category_slug: slug,
             category_label: p.category,
             brand: p.brand,
-            photo_url: p.photo_url,
+            photo_url: p.photo_url ?? imgsByProduct.get(p.id)?.[0] ?? null,
+            images: imgsByProduct.get(p.id) ?? (p.photo_url ? [p.photo_url] : []),
             description: p.description,
             price: Number(p.price_site ?? p.price ?? 0),
             stock: p.stock,

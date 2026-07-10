@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, Layers, Trash2, Upload, Download, Pencil, Check, X, FileText, Sparkles } from "lucide-react";
 import { History, ImageIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ProductImagesManager } from "@/components/ProductImagesManager";
 import { toast } from "sonner";
 import { brl, dateBR } from "@/lib/format";
 import { calcAllPrices, calcPrice, marginFromPrice, CHANNEL_FEES, CHANNEL_LABEL, totalCost, type Channel } from "@/lib/pricing";
@@ -669,9 +670,14 @@ function Page() {
         </DialogContent>
       </Dialog>
       <Dialog open={!!editingId} onOpenChange={(v) => !v && (setEditingId(null), setForm(empty))}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Editar produto {editingProduct?.name ? `— ${editingProduct.name}` : ""}</DialogTitle></DialogHeader>
           {editingProduct && (
+            <>
+            <div className="mb-4 border rounded-md p-3 bg-muted/30">
+              <div className="text-sm font-medium mb-2">Galeria de imagens (até 5)</div>
+              <ProductImagesManager productId={editingProduct.id} />
+            </div>
             <ProductForm
               form={form} setForm={setForm} suppliers={suppliers ?? []}
               submitting={update.isPending} submitLabel="Atualizar"
@@ -679,6 +685,7 @@ function Page() {
               onCancel={() => { setEditingId(null); setForm(empty); }}
               onSubmit={() => update.mutate({ id: editingId!, f: form, oldStock: Number(editingProduct.stock ?? 0) })}
             />
+            </>
           )}
         </DialogContent>
       </Dialog>
