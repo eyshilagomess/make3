@@ -499,8 +499,7 @@ function Page() {
                   </TableCell>
                   <TableCell className="font-mono text-xs">{p.sku ?? "—"}</TableCell>
                   <TableCell className="text-right text-sm tabular-nums">
-                    <div className="font-medium">{brl(ct)}</div>
-                    <div className="text-[10px] text-muted-foreground">padrão {Number(p.target_margin ?? 0)}%</div>
+                     <div className="font-medium">{brl(ct)}</div>
                   </TableCell>
                   <TableCell>{cell(p.price_site, "site")}</TableCell>
                   <TableCell>{cell(p.price_shopee, "shopee")}</TableCell>
@@ -814,7 +813,6 @@ function ProductForm({
       <div className="space-y-1.5"><Label>Custo (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={(e) => onCostChange("cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Embalagem (R$)</Label><Input type="number" step="0.01" value={form.packaging_cost} onChange={(e) => onCostChange("packaging_cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Outros custos (R$)</Label><Input type="number" step="0.01" value={form.other_costs} onChange={(e) => onCostChange("other_costs", e.target.value)} placeholder="Ex: brinde, etiqueta…" /></div>
-      <div className="space-y-1.5"><Label>Margem de lucro padrão (%)</Label><Input type="number" step="0.1" value={form.target_margin} onChange={(e) => onDefaultMarginChange(e.target.value)} /><p className="text-[10px] text-muted-foreground">Altera todas as plataformas de uma vez. Depois, ajuste Site, Shopee ou TikTok separadamente abaixo.</p></div>
 
       <div className="col-span-2 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
         <div className="flex items-center justify-between text-xs">
