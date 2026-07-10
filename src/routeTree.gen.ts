@@ -20,6 +20,7 @@ import { Route as AuthenticatedFornecedoresRouteImport } from './routes/_authent
 import { Route as AuthenticatedFechamentoRouteImport } from './routes/_authenticated/fechamento'
 import { Route as AuthenticatedEstoqueRouteImport } from './routes/_authenticated/estoque'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCuponsRouteImport } from './routes/_authenticated/cupons'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
 import { Route as AuthenticatedAlocacaoRouteImport } from './routes/_authenticated/alocacao'
 import { Route as ApiPublicShippingCalculateRouteImport } from './routes/api/public/shipping/calculate'
@@ -83,6 +84,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCuponsRoute = AuthenticatedCuponsRouteImport.update({
+  id: '/cupons',
+  path: '/cupons',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
   id: '/clientes',
   path: '/clientes',
@@ -127,6 +133,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/alocacao': typeof AuthenticatedAlocacaoRoute
   '/clientes': typeof AuthenticatedClientesRoute
+  '/cupons': typeof AuthenticatedCuponsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/estoque': typeof AuthenticatedEstoqueRoute
   '/fechamento': typeof AuthenticatedFechamentoRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/alocacao': typeof AuthenticatedAlocacaoRoute
   '/clientes': typeof AuthenticatedClientesRoute
+  '/cupons': typeof AuthenticatedCuponsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/estoque': typeof AuthenticatedEstoqueRoute
   '/fechamento': typeof AuthenticatedFechamentoRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/alocacao': typeof AuthenticatedAlocacaoRoute
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
+  '/_authenticated/cupons': typeof AuthenticatedCuponsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/estoque': typeof AuthenticatedEstoqueRoute
   '/_authenticated/fechamento': typeof AuthenticatedFechamentoRoute
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/alocacao'
     | '/clientes'
+    | '/cupons'
     | '/dashboard'
     | '/estoque'
     | '/fechamento'
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/alocacao'
     | '/clientes'
+    | '/cupons'
     | '/dashboard'
     | '/estoque'
     | '/fechamento'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/alocacao'
     | '/_authenticated/clientes'
+    | '/_authenticated/cupons'
     | '/_authenticated/dashboard'
     | '/_authenticated/estoque'
     | '/_authenticated/fechamento'
@@ -332,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/cupons': {
+      id: '/_authenticated/cupons'
+      path: '/cupons'
+      fullPath: '/cupons'
+      preLoaderRoute: typeof AuthenticatedCuponsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/clientes': {
       id: '/_authenticated/clientes'
       path: '/clientes'
@@ -387,6 +406,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedAlocacaoRoute: typeof AuthenticatedAlocacaoRoute
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
+  AuthenticatedCuponsRoute: typeof AuthenticatedCuponsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEstoqueRoute: typeof AuthenticatedEstoqueRoute
   AuthenticatedFechamentoRoute: typeof AuthenticatedFechamentoRoute
@@ -400,6 +420,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAlocacaoRoute: AuthenticatedAlocacaoRoute,
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
+  AuthenticatedCuponsRoute: AuthenticatedCuponsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEstoqueRoute: AuthenticatedEstoqueRoute,
   AuthenticatedFechamentoRoute: AuthenticatedFechamentoRoute,

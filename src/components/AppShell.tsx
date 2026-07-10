@@ -1,5 +1,5 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, ShoppingBag, Package, Users, Truck, Boxes, LogOut, BarChart3, Menu, Receipt, PiggyBank, CalendarCheck } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Package, Users, Truck, Boxes, LogOut, BarChart3, Menu, Receipt, PiggyBank, CalendarCheck, Tag } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ const nav = [
   { to: "/gastos", label: "Gastos", icon: Receipt },
   { to: "/fechamento", label: "Fechamento", icon: CalendarCheck },
   { to: "/alocacao", label: "Alocação", icon: PiggyBank },
+  { to: "/cupons", label: "Cupons", icon: Tag },
   { to: "/clientes", label: "Clientes", icon: Users },
   { to: "/fornecedores", label: "Fornecedores", icon: Truck },
 ] as const;
