@@ -518,28 +518,126 @@ function Page() {
       <InvoiceDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <CostHistoryDialog open={!!historyFor} product={historyFor} onClose={() => setHistoryFor(null)} />
       <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Editar preços em massa</DialogTitle></DialogHeader>
-          <div className="space-y-3 text-sm">
-            <p className="text-muted-foreground">Aplicar o markup abaixo a {selected.size} produto(s), recalculando o preço a partir do custo total.</p>
-            <div className="space-y-1.5">
-              <Label>Markup sobre custo (%)</Label>
-              <Input type="number" step="0.1" value={bulkMarkup} onChange={(e) => setBulkMarkup(e.target.value)} />
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Editar em massa · {selected.size} produto(s)</DialogTitle></DialogHeader>
+          <div className="space-y-4 text-sm">
+            <p className="text-muted-foreground text-xs">Marque os campos que deseja alterar. Só o que estiver marcado será aplicado.</p>
+
+            {/* Custos */}
+            <div className="rounded-md border p-3 space-y-3">
+              <div className="font-medium text-xs uppercase text-muted-foreground">Custos</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.packaging} onCheckedChange={(v) => setBulkOn({ ...bulkOn, packaging: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Embalagem (R$)</span>
+                    <Input type="number" step="0.01" value={bulkPackaging} onChange={(e) => setBulkPackaging(e.target.value)} disabled={!bulkOn.packaging} />
+                  </div>
+                </label>
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.other} onCheckedChange={(v) => setBulkOn({ ...bulkOn, other: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Outros custos (R$)</span>
+                    <Input type="number" step="0.01" value={bulkOther} onChange={(e) => setBulkOther(e.target.value)} disabled={!bulkOn.other} />
+                  </div>
+                </label>
+              </div>
+              {(bulkOn.packaging || bulkOn.other) && !bulkOn.markup && (
+                <p className="text-xs text-muted-foreground">Preços serão recalculados mantendo o markup atual de cada canal.</p>
+              )}
             </div>
-            <div className="space-y-1.5">
-              <Label>Canais</Label>
-              <div className="flex flex-wrap gap-3">
-                {(["site", "shopee", "tiktok"] as Channel[]).map((ch) => (
-                  <label key={ch} className="flex items-center gap-1.5 cursor-pointer">
-                    <Checkbox checked={(bulkChannels as any)[ch]} onCheckedChange={(v) => setBulkChannels({ ...bulkChannels, [ch]: Boolean(v) })} />
-                    <span>{CHANNEL_LABEL[ch]}</span>
-                  </label>
-                ))}
+
+            {/* Markup / preços */}
+            <div className="rounded-md border p-3 space-y-3">
+              <label className="flex items-center gap-2 font-medium text-xs uppercase text-muted-foreground">
+                <Checkbox checked={bulkOn.markup} onCheckedChange={(v) => setBulkOn({ ...bulkOn, markup: Boolean(v) })} />
+                Aplicar markup sobre custo
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Markup (%)</Label>
+                  <Input type="number" step="0.1" value={bulkMarkup} onChange={(e) => setBulkMarkup(e.target.value)} disabled={!bulkOn.markup} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Canais</Label>
+                  <div className="flex flex-wrap gap-3 pt-2">
+                    {(["site", "shopee", "tiktok"] as Channel[]).map((ch) => (
+                      <label key={ch} className="flex items-center gap-1.5 cursor-pointer">
+                        <Checkbox checked={(bulkChannels as any)[ch]} disabled={!bulkOn.markup} onCheckedChange={(v) => setBulkChannels({ ...bulkChannels, [ch]: Boolean(v) })} />
+                        <span>{CHANNEL_LABEL[ch]}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* Classificação */}
+            <div className="rounded-md border p-3 space-y-3">
+              <div className="font-medium text-xs uppercase text-muted-foreground">Classificação</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.category} onCheckedChange={(v) => setBulkOn({ ...bulkOn, category: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Categoria</span>
+                    <Input value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} disabled={!bulkOn.category} />
+                  </div>
+                </label>
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.brand} onCheckedChange={(v) => setBulkOn({ ...bulkOn, brand: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Marca</span>
+                    <Input value={bulkBrand} onChange={(e) => setBulkBrand(e.target.value)} disabled={!bulkOn.brand} />
+                  </div>
+                </label>
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.supplier} onCheckedChange={(v) => setBulkOn({ ...bulkOn, supplier: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Fornecedor</span>
+                    <Select value={bulkSupplier} onValueChange={setBulkSupplier} disabled={!bulkOn.supplier}>
+                      <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                      <SelectContent>
+                        {(suppliers ?? []).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Estoque */}
+            <div className="rounded-md border p-3 space-y-3">
+              <div className="font-medium text-xs uppercase text-muted-foreground">Estoque (ignora produtos com variantes)</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.stock} onCheckedChange={(v) => setBulkOn({ ...bulkOn, stock: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Quantidade</span>
+                    <div className="flex gap-2">
+                      <Select value={bulkStockMode} onValueChange={(v) => setBulkStockMode(v as any)} disabled={!bulkOn.stock}>
+                        <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="set">Definir</SelectItem>
+                          <SelectItem value="add">Somar</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input type="number" step="1" value={bulkStock} onChange={(e) => setBulkStock(e.target.value)} disabled={!bulkOn.stock} />
+                    </div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2">
+                  <Checkbox className="mt-1" checked={bulkOn.min_stock} onCheckedChange={(v) => setBulkOn({ ...bulkOn, min_stock: Boolean(v) })} />
+                  <div className="flex-1 space-y-1">
+                    <span>Estoque mínimo</span>
+                    <Input type="number" step="1" value={bulkMinStock} onChange={(e) => setBulkMinStock(e.target.value)} disabled={!bulkOn.min_stock} />
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setBulkEditOpen(false)}>Cancelar</Button>
-              <Button onClick={bulkApplyMarkup} disabled={bulkBusy} className="bg-gradient-brand text-primary-foreground border-0">
+              <Button onClick={bulkApply} disabled={bulkBusy} className="bg-gradient-brand text-primary-foreground border-0">
                 {bulkBusy ? "Aplicando…" : "Aplicar"}
               </Button>
             </div>
