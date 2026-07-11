@@ -268,6 +268,10 @@ function Page() {
     price_shopee: f.price_shopee === "" ? null : Number(f.price_shopee),
     price_tiktok: f.price_tiktok === "" ? null : Number(f.price_tiktok),
     price: f.price_site === "" ? Number(f.cost || 0) : Number(f.price_site),
+    weight_g: Number(f.weight_g || 200),
+    length_cm: Number(f.length_cm || 20),
+    width_cm: Number(f.width_cm || 15),
+    height_cm: Number(f.height_cm || 10),
   });
 
   const create = useMutation({
@@ -357,6 +361,10 @@ function Page() {
       margin_site: marginFor(p.price_site, "site"),
       margin_shopee: marginFor(p.price_shopee, "shopee"),
       margin_tiktok: marginFor(p.price_tiktok, "tiktok"),
+      weight_g: String(p.weight_g ?? 200),
+      length_cm: String(p.length_cm ?? 20),
+      width_cm: String(p.width_cm ?? 15),
+      height_cm: String(p.height_cm ?? 10),
     });
     setEditingId(p.id);
   };
