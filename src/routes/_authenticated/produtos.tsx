@@ -35,6 +35,7 @@ type Form = {
   has_variants: boolean;
   price_site: string; price_shopee: string; price_tiktok: string;
   margin_site: string; margin_shopee: string; margin_tiktok: string;
+  weight_g: string; length_cm: string; width_cm: string; height_cm: string;
 };
 const empty: Form = {
   name: "", sku: "", category: "", brand: "", supplier_id: "", photo_url: "",
@@ -42,6 +43,7 @@ const empty: Form = {
   stock: "0", min_stock: "0", has_variants: false,
   price_site: "", price_shopee: "", price_tiktok: "",
   margin_site: "30", margin_shopee: "30", margin_tiktok: "30",
+  weight_g: "200", length_cm: "20", width_cm: "15", height_cm: "10",
 };
 
 function Page() {
@@ -266,6 +268,10 @@ function Page() {
     price_shopee: f.price_shopee === "" ? null : Number(f.price_shopee),
     price_tiktok: f.price_tiktok === "" ? null : Number(f.price_tiktok),
     price: f.price_site === "" ? Number(f.cost || 0) : Number(f.price_site),
+    weight_g: Number(f.weight_g || 200),
+    length_cm: Number(f.length_cm || 20),
+    width_cm: Number(f.width_cm || 15),
+    height_cm: Number(f.height_cm || 10),
   });
 
   const create = useMutation({
@@ -355,6 +361,10 @@ function Page() {
       margin_site: marginFor(p.price_site, "site"),
       margin_shopee: marginFor(p.price_shopee, "shopee"),
       margin_tiktok: marginFor(p.price_tiktok, "tiktok"),
+      weight_g: String(p.weight_g ?? 200),
+      length_cm: String(p.length_cm ?? 20),
+      width_cm: String(p.width_cm ?? 15),
+      height_cm: String(p.height_cm ?? 10),
     });
     setEditingId(p.id);
   };
@@ -891,6 +901,15 @@ function ProductForm({
         <div className="space-y-1.5"><Label>{stockEditable ? "Estoque atual" : "Estoque inicial"}</Label><Input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} /></div>
         <div className="space-y-1.5"><Label>Estoque mínimo</Label><Input type="number" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: e.target.value })} /></div>
       </>}
+      <div className="col-span-2 rounded-md border border-border p-3 bg-muted/20 space-y-2">
+        <div className="text-xs text-muted-foreground">📦 Dimensões para cálculo de frete (Melhor Envio) — padrão 200g · 20×15×10 cm</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="space-y-1"><Label className="text-xs">Peso (g)</Label><Input type="number" step="1" value={form.weight_g} onChange={(e) => setForm({ ...form, weight_g: e.target.value })} /></div>
+          <div className="space-y-1"><Label className="text-xs">Comprimento (cm)</Label><Input type="number" step="0.1" value={form.length_cm} onChange={(e) => setForm({ ...form, length_cm: e.target.value })} /></div>
+          <div className="space-y-1"><Label className="text-xs">Largura (cm)</Label><Input type="number" step="0.1" value={form.width_cm} onChange={(e) => setForm({ ...form, width_cm: e.target.value })} /></div>
+          <div className="space-y-1"><Label className="text-xs">Altura (cm)</Label><Input type="number" step="0.1" value={form.height_cm} onChange={(e) => setForm({ ...form, height_cm: e.target.value })} /></div>
+        </div>
+      </div>
       <div className="col-span-2 flex justify-end gap-2 mt-2">
         <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
         <Button type="submit" disabled={submitting} className="bg-gradient-brand text-primary-foreground border-0">{submitting ? "Salvando…" : submitLabel}</Button>
