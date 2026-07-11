@@ -35,6 +35,7 @@ type Form = {
   has_variants: boolean;
   price_site: string; price_shopee: string; price_tiktok: string;
   margin_site: string; margin_shopee: string; margin_tiktok: string;
+  weight_g: string; length_cm: string; width_cm: string; height_cm: string;
 };
 const empty: Form = {
   name: "", sku: "", category: "", brand: "", supplier_id: "", photo_url: "",
@@ -42,6 +43,7 @@ const empty: Form = {
   stock: "0", min_stock: "0", has_variants: false,
   price_site: "", price_shopee: "", price_tiktok: "",
   margin_site: "30", margin_shopee: "30", margin_tiktok: "30",
+  weight_g: "200", length_cm: "20", width_cm: "15", height_cm: "10",
 };
 
 function Page() {
