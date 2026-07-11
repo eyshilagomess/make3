@@ -27,7 +27,7 @@ export function NotificationBell() {
 
   useEffect(() => {
     const ch = supabase
-      .channel("notifications-feed")
+      .channel(`notifications-feed-${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications" },
