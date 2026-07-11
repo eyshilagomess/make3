@@ -44,138 +44,6 @@ export type Database = {
         }
         Relationships: []
       }
-      coupon_redemptions: {
-        Row: {
-          channel: string | null
-          coupon_id: string
-          created_at: string
-          customer_email: string | null
-          customer_phone: string | null
-          discount_applied: number
-          id: string
-          order_id: string | null
-          order_subtotal: number | null
-        }
-        Insert: {
-          channel?: string | null
-          coupon_id: string
-          created_at?: string
-          customer_email?: string | null
-          customer_phone?: string | null
-          discount_applied?: number
-          id?: string
-          order_id?: string | null
-          order_subtotal?: number | null
-        }
-        Update: {
-          channel?: string | null
-          coupon_id?: string
-          created_at?: string
-          customer_email?: string | null
-          customer_phone?: string | null
-          discount_applied?: number
-          id?: string
-          order_id?: string | null
-          order_subtotal?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "coupon_redemptions_coupon_id_fkey"
-            columns: ["coupon_id"]
-            isOneToOne: false
-            referencedRelation: "coupons"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "coupon_redemptions_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      coupons: {
-        Row: {
-          active: boolean
-          applies_to: string
-          category_slugs: string[]
-          channels: string[]
-          code: string
-          created_at: string
-          created_by: string | null
-          description: string | null
-          discount_type: string
-          discount_value: number
-          first_purchase_only: boolean
-          free_shipping: boolean
-          id: string
-          max_discount: number | null
-          min_order_value: number
-          notes: string | null
-          per_customer_limit: number | null
-          product_ids: string[]
-          stackable: boolean
-          updated_at: string
-          usage_limit: number | null
-          used_count: number
-          valid_from: string | null
-          valid_until: string | null
-        }
-        Insert: {
-          active?: boolean
-          applies_to?: string
-          category_slugs?: string[]
-          channels?: string[]
-          code: string
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          discount_type: string
-          discount_value: number
-          first_purchase_only?: boolean
-          free_shipping?: boolean
-          id?: string
-          max_discount?: number | null
-          min_order_value?: number
-          notes?: string | null
-          per_customer_limit?: number | null
-          product_ids?: string[]
-          stackable?: boolean
-          updated_at?: string
-          usage_limit?: number | null
-          used_count?: number
-          valid_from?: string | null
-          valid_until?: string | null
-        }
-        Update: {
-          active?: boolean
-          applies_to?: string
-          category_slugs?: string[]
-          channels?: string[]
-          code?: string
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          discount_type?: string
-          discount_value?: number
-          first_purchase_only?: boolean
-          free_shipping?: boolean
-          id?: string
-          max_discount?: number | null
-          min_order_value?: number
-          notes?: string | null
-          per_customer_limit?: number | null
-          product_ids?: string[]
-          stackable?: boolean
-          updated_at?: string
-          usage_limit?: number | null
-          used_count?: number
-          valid_from?: string | null
-          valid_until?: string | null
-        }
-        Relationships: []
-      }
       customers: {
         Row: {
           address: string | null
@@ -335,36 +203,6 @@ export type Database = {
         }
         Relationships: []
       }
-      notifications: {
-        Row: {
-          created_at: string
-          data: Json | null
-          id: string
-          message: string | null
-          read: boolean
-          title: string
-          type: string
-        }
-        Insert: {
-          created_at?: string
-          data?: Json | null
-          id?: string
-          message?: string | null
-          read?: boolean
-          title: string
-          type: string
-        }
-        Update: {
-          created_at?: string
-          data?: Json | null
-          id?: string
-          message?: string | null
-          read?: boolean
-          title?: string
-          type?: string
-        }
-        Relationships: []
-      }
       order_items: {
         Row: {
           created_at: string
@@ -437,35 +275,22 @@ export type Database = {
           created_by: string | null
           customer_id: string | null
           customer_name_freeform: string | null
-          delivered_at: string | null
           discount: number
           external_reference: string | null
-          guest_email: string | null
-          guest_name: string | null
-          guest_phone: string | null
           id: string
           notes: string | null
           order_code: string
           payment_amount_1: number | null
           payment_amount_2: number | null
-          payment_link: string | null
           payment_method: Database["public"]["Enums"]["payment_method"] | null
           payment_method_2: Database["public"]["Enums"]["payment_method"] | null
           payment_proof_url: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
           seller_id: string | null
-          shipped_at: string | null
           shipping: number
-          shipping_address: Json | null
-          shipping_carrier: string | null
-          shipping_cep: string | null
-          shipping_deadline_days: number | null
-          shipping_service: string | null
-          source: string
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
           total: number
-          tracking_code: string | null
           updated_at: string
         }
         Insert: {
@@ -475,18 +300,13 @@ export type Database = {
           created_by?: string | null
           customer_id?: string | null
           customer_name_freeform?: string | null
-          delivered_at?: string | null
           discount?: number
           external_reference?: string | null
-          guest_email?: string | null
-          guest_name?: string | null
-          guest_phone?: string | null
           id?: string
           notes?: string | null
           order_code?: string
           payment_amount_1?: number | null
           payment_amount_2?: number | null
-          payment_link?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           payment_method_2?:
             | Database["public"]["Enums"]["payment_method"]
@@ -494,18 +314,10 @@ export type Database = {
           payment_proof_url?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           seller_id?: string | null
-          shipped_at?: string | null
           shipping?: number
-          shipping_address?: Json | null
-          shipping_carrier?: string | null
-          shipping_cep?: string | null
-          shipping_deadline_days?: number | null
-          shipping_service?: string | null
-          source?: string
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           total?: number
-          tracking_code?: string | null
           updated_at?: string
         }
         Update: {
@@ -515,18 +327,13 @@ export type Database = {
           created_by?: string | null
           customer_id?: string | null
           customer_name_freeform?: string | null
-          delivered_at?: string | null
           discount?: number
           external_reference?: string | null
-          guest_email?: string | null
-          guest_name?: string | null
-          guest_phone?: string | null
           id?: string
           notes?: string | null
           order_code?: string
           payment_amount_1?: number | null
           payment_amount_2?: number | null
-          payment_link?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           payment_method_2?:
             | Database["public"]["Enums"]["payment_method"]
@@ -534,18 +341,10 @@ export type Database = {
           payment_proof_url?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           seller_id?: string | null
-          shipped_at?: string | null
           shipping?: number
-          shipping_address?: Json | null
-          shipping_carrier?: string | null
-          shipping_cep?: string | null
-          shipping_deadline_days?: number | null
-          shipping_service?: string | null
-          source?: string
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           total?: number
-          tracking_code?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -587,47 +386,6 @@ export type Database = {
           reason?: string | null
         }
         Relationships: []
-      }
-      product_images: {
-        Row: {
-          created_at: string
-          id: string
-          is_primary: boolean
-          position: number
-          product_id: string
-          source: string
-          storage_path: string | null
-          url: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_primary?: boolean
-          position?: number
-          product_id: string
-          source?: string
-          storage_path?: string | null
-          url: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_primary?: boolean
-          position?: number
-          product_id?: string
-          source?: string
-          storage_path?: string | null
-          url?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "product_images_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       product_variants: {
         Row: {
@@ -695,9 +453,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           has_variants: boolean
-          height_cm: number
           id: string
-          length_cm: number
           min_stock: number
           name: string
           other_costs: number
@@ -713,8 +469,6 @@ export type Database = {
           supplier_id: string | null
           target_margin: number
           updated_at: string
-          weight_g: number
-          width_cm: number
         }
         Insert: {
           avg_cost?: number
@@ -725,9 +479,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           has_variants?: boolean
-          height_cm?: number
           id?: string
-          length_cm?: number
           min_stock?: number
           name: string
           other_costs?: number
@@ -743,8 +495,6 @@ export type Database = {
           supplier_id?: string | null
           target_margin?: number
           updated_at?: string
-          weight_g?: number
-          width_cm?: number
         }
         Update: {
           avg_cost?: number
@@ -755,9 +505,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           has_variants?: boolean
-          height_cm?: number
           id?: string
-          length_cm?: number
           min_stock?: number
           name?: string
           other_costs?: number
@@ -773,8 +521,6 @@ export type Database = {
           supplier_id?: string | null
           target_margin?: number
           updated_at?: string
-          weight_g?: number
-          width_cm?: number
         }
         Relationships: [
           {
@@ -864,27 +610,6 @@ export type Database = {
           },
         ]
       }
-      store_settings: {
-        Row: {
-          id: string
-          key: string
-          updated_at: string
-          value: Json
-        }
-        Insert: {
-          id?: string
-          key: string
-          updated_at?: string
-          value: Json
-        }
-        Update: {
-          id?: string
-          key?: string
-          updated_at?: string
-          value?: Json
-        }
-        Relationships: []
-      }
       suppliers: {
         Row: {
           contact_name: string | null
@@ -964,7 +689,6 @@ export type Database = {
         Returns: boolean
       }
       is_team_member: { Args: { _user_id: string }; Returns: boolean }
-      title_case_pt: { Args: { txt: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "gerente" | "vendedor"

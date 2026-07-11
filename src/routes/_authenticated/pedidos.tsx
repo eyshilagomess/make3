@@ -22,8 +22,6 @@ import {
 } from "@/lib/format";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { rangeFromPreset, DEFAULT_PRESET, toISO, endExclusiveISO, type DateRange } from "@/lib/date-range";
-import { useServerFn } from "@tanstack/react-start";
-import { notifyOrderEvent } from "@/lib/order-notify.functions";
 
 export const Route = createFileRoute("/_authenticated/pedidos")({
   head: () => ({ meta: [{ title: "Pedidos — Make 3" }] }),
@@ -59,7 +57,6 @@ const emptyForm: FormState = {
 function Page() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const notifyEvent = useServerFn(notifyOrderEvent);
   const [range, setRange] = useState<DateRange>(() => rangeFromPreset(DEFAULT_PRESET));
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -197,42 +194,28 @@ function Page() {
           if (prod) await supabase.from("products").update({ stock: Math.max(0, prod.stock - i.quantity) }).eq("id", i.product_id);
         }
       }
-      return order.id as string;
     },
-    onSuccess: (orderId) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["products"] });
       toast.success("Pedido registrado!");
       setOpen(false); reset();
-      if (orderId) notifyEvent({ data: { orderId, kind: "created" } }).catch(() => {});
     },
     onError: (e: any) => toast.error(e.message),
   });
 
   const update = useMutation({
     mutationFn: async () => {
-      if (!editingId) return null;
-      // detecta transição para enviado/entregue para disparar email pro cliente
-      const { data: prev } = await supabase.from("orders").select("status").eq("id", editingId).maybeSingle();
-      const payload = buildOrderPayload() as any;
-      if (form.status === "enviado" && prev?.status !== "enviado") payload.shipped_at = new Date().toISOString();
-      if (form.status === "entregue" && prev?.status !== "entregue") payload.delivered_at = new Date().toISOString();
-      const { error } = await supabase.from("orders").update(payload).eq("id", editingId);
+      if (!editingId) return;
+      const { error } = await supabase.from("orders").update(buildOrderPayload()).eq("id", editingId);
       if (error) throw error;
-      const transition =
-        form.status === "enviado" && prev?.status !== "enviado" ? "shipped" :
-        form.status === "entregue" && prev?.status !== "entregue" ? "delivered" : null;
-      return { id: editingId, transition } as const;
     },
-    onSuccess: (r) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       toast.success("Pedido atualizado!");
       setOpen(false); reset();
-      if (r?.id && r.transition) {
-        notifyEvent({ data: { orderId: r.id, kind: r.transition } }).catch(() => {});
-      }
     },
     onError: (e: any) => toast.error(e.message),
   });
