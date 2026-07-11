@@ -31,8 +31,8 @@ type Body = {
   external_reference?: string;
   payment_link?: string;
   payment?: {
-    status?: "pendente" | "pago" | "estornado" | "cancelado";
-    method?: string | null;
+    status?: "pendente" | "confirmado" | "aguardando_conferencia" | "estornado";
+    method?: "pix" | "cartao_credito" | "cartao_debito" | "boleto" | "dinheiro" | "transferencia" | "outros" | null;
     amount?: number | null;
     paid_at?: string | null;
   };
@@ -67,16 +67,16 @@ export const Route = createFileRoute("/api/public/orders/create")({
             .eq("external_reference", body.external_reference)
             .maybeSingle();
           if (existingOrder) {
-            // If payload now says "pago" and DB still shows pending, promote it
-            if (body.payment?.status === "pago") {
+            // If payload now confirms payment and DB still shows pending, promote it
+            if (body.payment?.status === "confirmado") {
               await supabaseAdmin
                 .from("orders")
                 .update({
-                  payment_status: "pago",
+                  payment_status: "confirmado",
                   payment_method: body.payment.method ?? undefined,
                 })
                 .eq("id", existingOrder.id)
-                .neq("payment_status", "pago");
+                .neq("payment_status", "confirmado");
             }
             return json({
               order_id: existingOrder.id,
@@ -145,7 +145,8 @@ export const Route = createFileRoute("/api/public/orders/create")({
         const total = +(subtotal - discount + shippingPrice).toFixed(2);
 
         const paymentStatus = body.payment?.status ?? "pendente";
-        const orderStatus = paymentStatus === "pago" ? "processando" : "pendente";
+        const orderStatus: "pendente" | "em_preparacao" =
+          paymentStatus === "confirmado" ? "em_preparacao" : "pendente";
 
         // Upsert customer by email/phone (best-effort)
         let customer_id: string | null = null;
