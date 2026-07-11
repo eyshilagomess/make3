@@ -30,6 +30,12 @@ type Body = {
   notes?: string;
   external_reference?: string;
   payment_link?: string;
+  payment?: {
+    status?: "pendente" | "confirmado" | "aguardando_conferencia" | "estornado";
+    method?: "pix" | "cartao_credito" | "cartao_debito" | "boleto" | "dinheiro" | "transferencia" | "outros" | null;
+    amount?: number | null;
+    paid_at?: string | null;
+  };
 };
 
 export const Route = createFileRoute("/api/public/orders/create")({
@@ -52,6 +58,34 @@ export const Route = createFileRoute("/api/public/orders/create")({
         if (!body?.shipping?.cep) return json({ error: "shipping_required" }, 400);
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        // Idempotency: if this external_reference already produced an order, return it
+        if (body.external_reference) {
+          const { data: existingOrder } = await supabaseAdmin
+            .from("orders")
+            .select("id, order_code, total")
+            .eq("external_reference", body.external_reference)
+            .maybeSingle();
+          if (existingOrder) {
+            // If payload now confirms payment and DB still shows pending, promote it
+            if (body.payment?.status === "confirmado") {
+              await supabaseAdmin
+                .from("orders")
+                .update({
+                  payment_status: "confirmado",
+                  payment_method: body.payment.method ?? undefined,
+                })
+                .eq("id", existingOrder.id)
+                .neq("payment_status", "confirmado");
+            }
+            return json({
+              order_id: existingOrder.id,
+              order_code: existingOrder.order_code,
+              total: existingOrder.total,
+              duplicate: true,
+            });
+          }
+        }
 
         // Load products (server-side pricing — never trust client)
         const productIds = Array.from(new Set(body.items.map((i) => i.product_id)));
@@ -110,6 +144,10 @@ export const Route = createFileRoute("/api/public/orders/create")({
         const discount = Math.max(0, Number(body.discount || 0));
         const total = +(subtotal - discount + shippingPrice).toFixed(2);
 
+        const paymentStatus = body.payment?.status ?? "pendente";
+        const orderStatus: "pendente" | "em_preparacao" =
+          paymentStatus === "confirmado" ? "em_preparacao" : "pendente";
+
         // Upsert customer by email/phone (best-effort)
         let customer_id: string | null = null;
         const email = body.customer.email?.trim() || null;
@@ -138,8 +176,9 @@ export const Route = createFileRoute("/api/public/orders/create")({
             customer_id,
             channel: "site",
             source: "site",
-            status: "pendente",
-            payment_status: "pendente",
+            status: orderStatus,
+            payment_status: paymentStatus,
+            payment_method: body.payment?.method ?? null,
             subtotal,
             discount,
             shipping: shippingPrice,
