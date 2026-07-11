@@ -118,3 +118,21 @@ export function renderCustomerDeliveredEmail(o: OrderEmailInfo) {
      <p>Se puder, comente com a gente o que achou dos produtos! Muito obrigada 💖</p>`,
   );
 }
+
+export function renderCustomerNewOrderEmail(o: OrderEmailInfo) {
+  const rows = (o.items ?? [])
+    .map(
+      (i) => `<tr>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee">${i.quantity}× ${i.product_name}${i.variant_name ? ` — ${i.variant_name}` : ""}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${brl(i.unit_price * i.quantity)}</td>
+      </tr>`,
+    )
+    .join("");
+  return shell(
+    `💖 Recebemos seu pedido!`,
+    `<p>Oi ${o.customer_name ?? ""}, recebemos seu pedido <b>${o.order_code ?? ""}</b> e já estamos preparando com carinho.</p>
+     <p><b>Total:</b> ${brl(o.total)}</p>
+     ${rows ? `<table style="width:100%;border-collapse:collapse;margin-top:12px">${rows}</table>` : ""}
+     <p style="margin-top:16px">Assim que enviarmos, você recebe o código de rastreio por aqui. Obrigada por comprar com a Make 3! ✨</p>`,
+  );
+}

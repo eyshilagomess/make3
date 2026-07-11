@@ -49,6 +49,14 @@ export const notifyOrderEvent = createServerFn({ method: "POST" })
           html: notify.renderOwnerNewOrderEmail(info),
         });
       }
+      // Envia confirmação para a cliente (independente do canal — site, whatsapp, presencial, etc.)
+      if (info.customer_email) {
+        await notify.sendEmail({
+          to: info.customer_email,
+          subject: `💖 Recebemos seu pedido ${order.order_code ?? ""} — Make 3`,
+          html: notify.renderCustomerNewOrderEmail(info),
+        });
+      }
       // usa supabaseAdmin para bypassar RLS (notificação da equipe)
       await supabaseAdmin.from("notifications").insert({
         type: "order_created",
