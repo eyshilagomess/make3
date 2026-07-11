@@ -14,8 +14,14 @@ type CartItem = {
 };
 
 type Body = {
-  to_cep: string;
-  items: CartItem[];
+  to_cep?: string;
+  cep?: string;
+  postal_code?: string;
+  to?: { postal_code?: string; cep?: string } | string;
+  destination?: { cep?: string; postal_code?: string };
+  items?: CartItem[];
+  products?: CartItem[];
+  cart?: CartItem[];
 };
 
 function json(body: unknown, status = 200) {
@@ -42,19 +48,28 @@ export const Route = createFileRoute("/api/public/shipping/calculate")({
           return json({ error: "invalid_json" }, 400);
         }
 
-        const to = String(body?.to_cep ?? "").replace(/\D/g, "");
+        const rawCep =
+          body?.to_cep ??
+          body?.cep ??
+          body?.postal_code ??
+          (typeof body?.to === "string" ? body.to : body?.to?.postal_code ?? body?.to?.cep) ??
+          body?.destination?.cep ??
+          body?.destination?.postal_code ??
+          "";
+        const to = String(rawCep ?? "").replace(/\D/g, "");
         if (to.length !== 8) {
-          console.error("[shipping] invalid_cep", body?.to_cep);
-          return json({ error: "invalid_cep", got: body?.to_cep }, 400);
+          console.error("[shipping] invalid_cep", { rawCep, keys: Object.keys(body ?? {}) });
+          return json({ error: "invalid_cep", got: rawCep, hint: "send { to_cep: '31110210', items: [{product_id, quantity}] }" }, 400);
         }
-        if (!Array.isArray(body.items) || body.items.length === 0) {
+        const items = (body.items ?? body.products ?? body.cart ?? []) as CartItem[];
+        if (!Array.isArray(items) || items.length === 0) {
           console.error("[shipping] empty_cart", body);
           return json({ error: "empty_cart" }, 400);
         }
 
         // Load real product dimensions from DB (never trust client)
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const productIds = Array.from(new Set(body.items.map((i) => i.product_id).filter(Boolean)));
+        const productIds = Array.from(new Set(items.map((i) => i.product_id).filter(Boolean)));
         const { data: products, error } = await supabaseAdmin
           .from("products")
           .select("id, price_site, weight_g, length_cm, width_cm, height_cm")
@@ -62,12 +77,12 @@ export const Route = createFileRoute("/api/public/shipping/calculate")({
         if (error) return json({ error: "db_error", detail: error.message }, 500);
 
         const byId = new Map((products ?? []).map((p) => [p.id, p]));
-        const missing = body.items.filter((it) => !byId.get(it.product_id)).map((it) => it.product_id);
+        const missing = items.filter((it) => !byId.get(it.product_id)).map((it) => it.product_id);
         if (missing.length) {
           console.error("[shipping] products_not_found", missing);
           return json({ error: "product_not_found", missing }, 400);
         }
-        const meProducts = body.items.map((it, idx) => {
+        const meProducts = items.map((it, idx) => {
           const p = byId.get(it.product_id)!;
           const qty = Math.max(1, Number(it.quantity || 1));
           return {
