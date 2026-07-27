@@ -52,6 +52,7 @@ function Page() {
   const [sortBy, setSortBy] = useState<"name_asc" | "name_desc" | "recent" | "oldest" | "price_asc" | "price_desc" | "stock_asc" | "stock_desc">("name_asc");
   const [variantsFor, setVariantsFor] = useState<{ id: string; name: string } | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [shopeeOpen, setShopeeOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
@@ -387,7 +388,7 @@ function Page() {
             <ImageIcon className="h-4 w-4 mr-1" /> {bulkImgBusy ? "Buscando…" : "Buscar fotos"}
           </Button>
           <Button variant="outline" onClick={downloadTemplate}><Download className="h-4 w-4 mr-1" /> Modelo</Button>
-          <Button variant="outline" onClick={() => exportShopee(filtered)}><Download className="h-4 w-4 mr-1" /> Exportar Shopee</Button>
+          <Button variant="outline" onClick={() => setShopeeOpen(true)}><Download className="h-4 w-4 mr-1" /> Exportar Shopee</Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-1" /> Importar</Button>
           <Button variant="outline" onClick={() => setInvoiceOpen(true)}><FileText className="h-4 w-4 mr-1" /> Nota fiscal</Button>
           <Dialog open={open} onOpenChange={setOpen}>
@@ -541,6 +542,7 @@ function Page() {
 
       <VariantsDialog open={!!variantsFor} product={variantsFor} onClose={() => setVariantsFor(null)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
+      <ShopeeExportDialog open={shopeeOpen} onClose={() => setShopeeOpen(false)} products={filtered} />
       <InvoiceDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <CostHistoryDialog open={!!historyFor} product={historyFor} onClose={() => setHistoryFor(null)} />
       <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
@@ -920,7 +922,7 @@ const C = {
   weight: 26, length: 27, width: 28, height: 29, correios: 30,
 };
 
-function exportShopee(products: any[]) {
+function buildShopeeRows(products: any[]) {
   const rows: any[][] = [];
   let integration = 100;
 
@@ -969,12 +971,91 @@ function exportShopee(products: any[]) {
       rows.push(make({ price: p.price_shopee, stock: p.stock, sku: p.sku ?? "" }));
     }
   }
+  return rows;
+}
 
+const shopeeFileName = () => `shopee_mass_upload_make3_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+// Preenche o ARQUIVO ORIGINAL da Shopee (mantém abas ocultas, nomes de abas e validações),
+// que é o que a Shopee valida no upload em massa.
+async function exportShopeeFromTemplate(products: any[], file: File) {
+  const rows = buildShopeeRows(products);
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array", cellStyles: true });
+
+  const key = "ps_product_name";
+  let target: string | undefined;
+  for (const name of wb.SheetNames) {
+    const aoa = XLSX.utils.sheet_to_json<any[]>(wb.Sheets[name], { header: 1, blankrows: true });
+    if ((aoa[0] ?? []).some((c) => String(c ?? "").startsWith(key))) { target = name; break; }
+  }
+  if (!target) throw new Error("Não encontrei a aba de produtos no modelo enviado.");
+
+  const ws = wb.Sheets[target];
+  const aoa = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, blankrows: true });
+  // mantém apenas as linhas de cabeçalho do modelo (as 6 primeiras) e injeta os produtos
+  const headerRows = aoa.slice(0, SHOPEE_TEMPLATE_HEADER.length);
+  const filled = XLSX.utils.aoa_to_sheet([...headerRows, ...rows]);
+  if (ws["!cols"]) filled["!cols"] = ws["!cols"];
+  wb.Sheets[target] = filled;
+
+  XLSX.writeFile(wb, shopeeFileName(), { bookType: "xlsx", compression: true });
+  return rows.length;
+}
+
+function exportShopeeGeneric(products: any[]) {
+  const rows = buildShopeeRows(products);
   const ws = XLSX.utils.aoa_to_sheet([...SHOPEE_TEMPLATE_HEADER, ...rows]);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Modelo");
-  XLSX.writeFile(wb, `shopee_mass_upload_make3_${new Date().toISOString().slice(0, 10)}.xlsx`);
-  toast.success(`${rows.length} linha(s) exportada(s) no modelo oficial da Shopee`);
+  XLSX.utils.book_append_sheet(wb, ws, "Template");
+  XLSX.writeFile(wb, shopeeFileName(), { bookType: "xlsx", compression: true });
+  return rows.length;
+}
+
+function ShopeeExportDialog({ open, onClose, products }: { open: boolean; onClose: () => void; products: any[] }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      const n = file ? await exportShopeeFromTemplate(products, file) : exportShopeeGeneric(products);
+      toast.success(`${n} linha(s) exportada(s)${file ? " no arquivo oficial da Shopee" : ""}`);
+      onClose();
+    } catch (e: any) {
+      toast.error(e.message ?? "Falha ao gerar a planilha");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Exportar para a Shopee</DialogTitle></DialogHeader>
+        <div className="space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            A Shopee recusa arquivos que não sejam o modelo original dela (ela valida as abas ocultas do arquivo).
+            Baixe o modelo em massa na Central do Vendedor, selecione ele aqui e nós preenchemos seus produtos dentro dele.
+          </p>
+          <div className="space-y-1.5">
+            <Label>Modelo oficial da Shopee (.xlsx)</Label>
+            <Input type="file" accept=".xlsx,.xls" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            {file && <p className="text-xs text-muted-foreground">{file.name}</p>}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Sem o modelo, geramos uma planilha simples com as mesmas colunas — útil para conferência, mas a Shopee pode recusar no upload.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            <Button onClick={run} disabled={busy} className="bg-gradient-brand text-primary-foreground border-0">
+              {busy ? "Gerando…" : file ? "Preencher modelo" : "Gerar planilha simples"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function ImportDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
