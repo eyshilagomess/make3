@@ -904,6 +904,60 @@ function downloadTemplate() {
   XLSX.writeFile(wb, "modelo_precificacao_make3.xlsx");
 }
 
+const SHOPEE_HEADERS = [
+  "Nome do produto", "Descrição do produto", "Categoria", "Marca", "SKU pai",
+  "Nome da variação 1", "Opção da variação 1", "SKU da variação", "Preço", "Estoque",
+  "Peso (kg)", "Comprimento (cm)", "Largura (cm)", "Altura (cm)", "Link da imagem de capa",
+];
+
+function exportShopee(products: any[]) {
+  const rows: any[][] = [];
+  for (const p of products) {
+    if (p.status && p.status !== "ativo") continue;
+    const base = [
+      p.name ?? "",
+      p.description ?? p.name ?? "",
+      p.category ?? "",
+      p.brand ?? "",
+      p.sku ?? "",
+    ];
+    const tail = (price: any, stock: any) => [
+      price != null ? Number(price).toFixed(2) : "",
+      stock ?? 0,
+      ((Number(p.weight_g ?? 200)) / 1000).toFixed(3),
+      p.length_cm ?? 20, p.width_cm ?? 15, p.height_cm ?? 10,
+      p.photo_url ?? "",
+    ];
+    const variants = p.has_variants ? (p.product_variants ?? []) : [];
+    if (variants.length > 0) {
+      for (const v of variants) {
+        rows.push([
+          ...base, "Cor/Tom", v.name ?? "", v.sku ?? "",
+          ...tail(Number(p.price_shopee ?? 0) + Number(v.extra_price ?? 0), v.stock),
+        ]);
+      }
+    } else {
+      rows.push([...base, "", "", p.sku ?? "", ...tail(p.price_shopee, p.stock)]);
+    }
+  }
+  const ws = XLSX.utils.aoa_to_sheet([SHOPEE_HEADERS, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "shopee");
+  XLSX.writeFile(wb, `produtos_shopee_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  toast.success(`${rows.length} linha(s) exportada(s) para Shopee`);
+}
+
+function _unusedDownloadTemplate() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    TEMPLATE_HEADERS,
+    ["Base Líquida Make 3", "BASE-001", "Base", "Make 3", 18.5, 2.0, 0.5, 30, 5, "nao"],
+    ["Batom Matte Vermelho", "BAT-002", "Batom", "Make 3", 7.0, 1.0, 0, 35, 3, "nao"],
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "produtos");
+  XLSX.writeFile(wb, "modelo_precificacao_make3.xlsx");
+}
+
 function ImportDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const [rows, setRows] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
