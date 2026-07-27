@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { brl, dateBR } from "@/lib/format";
 import { calcAllPrices, calcPrice, marginFromPrice, CHANNEL_FEES, CHANNEL_LABEL, totalCost, type Channel } from "@/lib/pricing";
 import * as XLSX from "xlsx";
+import shopeeTemplate from "@/lib/shopee-template.json";
 import { useServerFn } from "@tanstack/react-start";
 import { extractFromImage } from "@/lib/extract-invoice.functions";
 import { searchProductImage } from "@/lib/search-image.functions";
@@ -905,47 +906,75 @@ function downloadTemplate() {
   XLSX.writeFile(wb, "modelo_precificacao_make3.xlsx");
 }
 
-const SHOPEE_HEADERS = [
-  "Nome do produto", "Descrição do produto", "Categoria", "Marca", "SKU pai",
-  "Nome da variação 1", "Opção da variação 1", "SKU da variação", "Preço", "Estoque",
-  "Peso (kg)", "Comprimento (cm)", "Largura (cm)", "Altura (cm)", "Link da imagem de capa",
-];
+// Cabeçalho oficial do modelo de upload em massa da Shopee (6 primeiras linhas).
+// Os dados começam na linha 7, exatamente como a planilha original exige.
+const SHOPEE_TEMPLATE_HEADER: string[][] = shopeeTemplate as string[][];
+const SHOPEE_COLS = SHOPEE_TEMPLATE_HEADER[0].length;
+
+// Índices (0-based) das colunas usadas do modelo oficial
+const C = {
+  category: 0, name: 1, description: 2, skuParent: 3,
+  varIntegrationNo: 4, var1Name: 5, var1Option: 6, varImage: 7,
+  price: 10, stock: 11, skuVariation: 12,
+  coverImage: 17, image1: 18,
+  weight: 26, length: 27, width: 28, height: 29, correios: 30,
+};
 
 function exportShopee(products: any[]) {
   const rows: any[][] = [];
+  let integration = 100;
+
   for (const p of products) {
     if (p.status && p.status !== "ativo") continue;
-    const base = [
-      p.name ?? "",
-      p.description ?? p.name ?? "",
-      p.category ?? "",
-      p.brand ?? "",
-      p.sku ?? "",
-    ];
-    const tail = (price: any, stock: any) => [
-      price != null ? Number(price).toFixed(2) : "",
-      stock ?? 0,
-      ((Number(p.weight_g ?? 200)) / 1000).toFixed(3),
-      p.length_cm ?? 20, p.width_cm ?? 15, p.height_cm ?? 10,
-      p.photo_url ?? "",
-    ];
+
+    const make = (opts: { price: any; stock: any; sku: any; variation?: string; intNo?: string }) => {
+      const r: any[] = new Array(SHOPEE_COLS).fill("");
+      r[C.category] = p.shopee_category_id ?? "";
+      r[C.name] = String(p.name ?? "").slice(0, 120);
+      r[C.description] = String(p.description || p.name || "").slice(0, 5000);
+      r[C.skuParent] = p.sku ?? "";
+      if (opts.variation) {
+        r[C.varIntegrationNo] = opts.intNo ?? "";
+        r[C.var1Name] = "Cor/Tom";
+        r[C.var1Option] = opts.variation.slice(0, 30);
+        r[C.varImage] = p.photo_url ?? "";
+      }
+      r[C.price] = opts.price != null ? Number(opts.price).toFixed(2) : "";
+      r[C.stock] = Number(opts.stock ?? 0);
+      r[C.skuVariation] = opts.sku ?? "";
+      r[C.coverImage] = p.photo_url ?? "";
+      r[C.image1] = p.photo_url ?? "";
+      r[C.weight] = (Number(p.weight_g ?? 200) / 1000).toFixed(3);
+      r[C.length] = p.length_cm ?? 20;
+      r[C.width] = p.width_cm ?? 15;
+      r[C.height] = p.height_cm ?? 10;
+      r[C.correios] = "Ativar";
+      return r;
+    };
+
     const variants = p.has_variants ? (p.product_variants ?? []) : [];
     if (variants.length > 0) {
+      integration += 1;
+      const intNo = String(integration);
       for (const v of variants) {
-        rows.push([
-          ...base, "Cor/Tom", v.name ?? "", v.sku ?? "",
-          ...tail(Number(p.price_shopee ?? 0) + Number(v.extra_price ?? 0), v.stock),
-        ]);
+        rows.push(make({
+          price: Number(p.price_shopee ?? 0) + Number(v.extra_price ?? 0),
+          stock: v.stock,
+          sku: v.sku ?? p.sku ?? "",
+          variation: v.name ?? "Único",
+          intNo,
+        }));
       }
     } else {
-      rows.push([...base, "", "", p.sku ?? "", ...tail(p.price_shopee, p.stock)]);
+      rows.push(make({ price: p.price_shopee, stock: p.stock, sku: p.sku ?? "" }));
     }
   }
-  const ws = XLSX.utils.aoa_to_sheet([SHOPEE_HEADERS, ...rows]);
+
+  const ws = XLSX.utils.aoa_to_sheet([...SHOPEE_TEMPLATE_HEADER, ...rows]);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "shopee");
-  XLSX.writeFile(wb, `produtos_shopee_${new Date().toISOString().slice(0, 10)}.xlsx`);
-  toast.success(`${rows.length} linha(s) exportada(s) para Shopee`);
+  XLSX.utils.book_append_sheet(wb, ws, "Modelo");
+  XLSX.writeFile(wb, `shopee_mass_upload_make3_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  toast.success(`${rows.length} linha(s) exportada(s) no modelo oficial da Shopee`);
 }
 
 function ImportDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
