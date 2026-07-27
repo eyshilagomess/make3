@@ -947,17 +947,6 @@ function exportShopee(products: any[]) {
   toast.success(`${rows.length} linha(s) exportada(s) para Shopee`);
 }
 
-function _unusedDownloadTemplate() {
-  const ws = XLSX.utils.aoa_to_sheet([
-    TEMPLATE_HEADERS,
-    ["Base Líquida Make 3", "BASE-001", "Base", "Make 3", 18.5, 2.0, 0.5, 30, 5, "nao"],
-    ["Batom Matte Vermelho", "BAT-002", "Batom", "Make 3", 7.0, 1.0, 0, 35, 3, "nao"],
-  ]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "produtos");
-  XLSX.writeFile(wb, "modelo_precificacao_make3.xlsx");
-}
-
 function ImportDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const [rows, setRows] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
