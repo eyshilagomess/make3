@@ -52,6 +52,7 @@ function Page() {
   const [sortBy, setSortBy] = useState<"name_asc" | "name_desc" | "recent" | "oldest" | "price_asc" | "price_desc" | "stock_asc" | "stock_desc">("name_asc");
   const [variantsFor, setVariantsFor] = useState<{ id: string; name: string } | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [shopeeOpen, setShopeeOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
