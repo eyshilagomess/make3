@@ -542,6 +542,7 @@ function Page() {
 
       <VariantsDialog open={!!variantsFor} product={variantsFor} onClose={() => setVariantsFor(null)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
+      <ShopeeExportDialog open={shopeeOpen} onClose={() => setShopeeOpen(false)} products={filtered} />
       <InvoiceDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <CostHistoryDialog open={!!historyFor} product={historyFor} onClose={() => setHistoryFor(null)} />
       <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
