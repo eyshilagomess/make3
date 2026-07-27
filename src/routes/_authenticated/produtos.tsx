@@ -386,6 +386,7 @@ function Page() {
             <ImageIcon className="h-4 w-4 mr-1" /> {bulkImgBusy ? "Buscando…" : "Buscar fotos"}
           </Button>
           <Button variant="outline" onClick={downloadTemplate}><Download className="h-4 w-4 mr-1" /> Modelo</Button>
+          <Button variant="outline" onClick={() => exportShopee(filtered)}><Download className="h-4 w-4 mr-1" /> Exportar Shopee</Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-1" /> Importar</Button>
           <Button variant="outline" onClick={() => setInvoiceOpen(true)}><FileText className="h-4 w-4 mr-1" /> Nota fiscal</Button>
           <Dialog open={open} onOpenChange={setOpen}>
