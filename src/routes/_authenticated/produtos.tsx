@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { brl, dateBR } from "@/lib/format";
 import { calcAllPrices, calcPrice, marginFromPrice, CHANNEL_FEES, CHANNEL_LABEL, totalCost, type Channel } from "@/lib/pricing";
 import * as XLSX from "xlsx";
+import shopeeTemplate from "@/lib/shopee-template.json";
 import { useServerFn } from "@tanstack/react-start";
 import { extractFromImage } from "@/lib/extract-invoice.functions";
 import { searchProductImage } from "@/lib/search-image.functions";
