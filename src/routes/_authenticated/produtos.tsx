@@ -1037,53 +1037,88 @@ function buildShopeeRows(products: any[]) {
   return rows;
 }
 
-const shopeeFileName = () => `shopee_mass_upload_make3_${new Date().toISOString().slice(0, 10)}.xlsx`;
+const shopeeFileName = (part?: number, total?: number) =>
+  `shopee_mass_upload_make3_${new Date().toISOString().slice(0, 10)}${
+    total && total > 1 ? `_parte${String(part).padStart(2, "0")}de${String(total).padStart(2, "0")}` : ""
+  }.xlsx`;
+
+const chunk = <T,>(arr: T[], size: number): T[][] => {
+  if (!size || size <= 0 || size >= arr.length) return [arr];
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+};
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Preenche o ARQUIVO ORIGINAL da Shopee (mantém abas ocultas, nomes de abas e validações),
 // que é o que a Shopee valida no upload em massa.
-async function exportShopeeFromTemplate(products: any[], file: File) {
-  const rows = buildShopeeRows(products);
+async function exportShopeeFromTemplate(products: any[], file: File, perFile = 0) {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellStyles: true });
+  const batches = chunk(products, perFile);
+  let rowCount = 0;
 
-  const key = "ps_product_name";
-  let target: string | undefined;
-  for (const name of wb.SheetNames) {
-    const aoa = XLSX.utils.sheet_to_json<any[]>(wb.Sheets[name], { header: 1, blankrows: true });
-    if ((aoa[0] ?? []).some((c) => String(c ?? "").startsWith(key))) { target = name; break; }
+  for (let i = 0; i < batches.length; i++) {
+    const rows = buildShopeeRows(batches[i]);
+    if (rows.length === 0) continue;
+    rowCount += rows.length;
+
+    const wb = XLSX.read(buf, { type: "array", cellStyles: true });
+    const key = "ps_product_name";
+    let target: string | undefined;
+    for (const name of wb.SheetNames) {
+      const aoa = XLSX.utils.sheet_to_json<any[]>(wb.Sheets[name], { header: 1, blankrows: true });
+      if ((aoa[0] ?? []).some((c) => String(c ?? "").startsWith(key))) { target = name; break; }
+    }
+    if (!target) throw new Error("Não encontrei a aba de produtos no modelo enviado.");
+
+    const ws = wb.Sheets[target];
+    const aoa = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, blankrows: true });
+    // mantém apenas as linhas de cabeçalho do modelo (as 6 primeiras) e injeta os produtos
+    const headerRows = aoa.slice(0, SHOPEE_TEMPLATE_HEADER.length);
+    const filled = XLSX.utils.aoa_to_sheet([...headerRows, ...rows]);
+    if (ws["!cols"]) filled["!cols"] = ws["!cols"];
+    wb.Sheets[target] = filled;
+
+    XLSX.writeFile(wb, shopeeFileName(i + 1, batches.length), { bookType: "xlsx", compression: true });
+    if (i < batches.length - 1) await wait(700);
   }
-  if (!target) throw new Error("Não encontrei a aba de produtos no modelo enviado.");
-
-  const ws = wb.Sheets[target];
-  const aoa = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, blankrows: true });
-  // mantém apenas as linhas de cabeçalho do modelo (as 6 primeiras) e injeta os produtos
-  const headerRows = aoa.slice(0, SHOPEE_TEMPLATE_HEADER.length);
-  const filled = XLSX.utils.aoa_to_sheet([...headerRows, ...rows]);
-  if (ws["!cols"]) filled["!cols"] = ws["!cols"];
-  wb.Sheets[target] = filled;
-
-  XLSX.writeFile(wb, shopeeFileName(), { bookType: "xlsx", compression: true });
-  return rows.length;
+  return { rows: rowCount, files: batches.length };
 }
 
-function exportShopeeGeneric(products: any[]) {
-  const rows = buildShopeeRows(products);
-  const ws = XLSX.utils.aoa_to_sheet([...SHOPEE_TEMPLATE_HEADER, ...rows]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Template");
-  XLSX.writeFile(wb, shopeeFileName(), { bookType: "xlsx", compression: true });
-  return rows.length;
+async function exportShopeeGeneric(products: any[], perFile = 0) {
+  const batches = chunk(products, perFile);
+  let rowCount = 0;
+  for (let i = 0; i < batches.length; i++) {
+    const rows = buildShopeeRows(batches[i]);
+    if (rows.length === 0) continue;
+    rowCount += rows.length;
+    const ws = XLSX.utils.aoa_to_sheet([...SHOPEE_TEMPLATE_HEADER, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, shopeeFileName(i + 1, batches.length), { bookType: "xlsx", compression: true });
+    if (i < batches.length - 1) await wait(700);
+  }
+  return { rows: rowCount, files: batches.length };
 }
 
 function ShopeeExportDialog({ open, onClose, products }: { open: boolean; onClose: () => void; products: any[] }) {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [perFile, setPerFile] = useState<number>(20);
+
+  const activeProducts = products.filter((p: any) => !p.status || p.status === "ativo");
+  const totalFiles = perFile > 0 ? Math.max(1, Math.ceil(activeProducts.length / perFile)) : 1;
 
   const run = async () => {
     setBusy(true);
     try {
-      const n = file ? await exportShopeeFromTemplate(products, file) : exportShopeeGeneric(products);
-      toast.success(`${n} linha(s) exportada(s)${file ? " no arquivo oficial da Shopee" : ""}`);
+      const res = file
+        ? await exportShopeeFromTemplate(products, file, perFile)
+        : await exportShopeeGeneric(products, perFile);
+      toast.success(
+        `${res.rows} linha(s) em ${res.files} arquivo(s)${file ? " no modelo oficial da Shopee" : ""}`,
+      );
       onClose();
     } catch (e: any) {
       toast.error(e.message ?? "Falha ao gerar a planilha");
@@ -1106,13 +1141,38 @@ function ShopeeExportDialog({ open, onClose, products }: { open: boolean; onClos
             <Input type="file" accept=".xlsx,.xls" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             {file && <p className="text-xs text-muted-foreground">{file.name}</p>}
           </div>
+          <div className="space-y-1.5">
+            <Label>Produtos por arquivo</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={1}
+                value={perFile}
+                onChange={(e) => setPerFile(Math.max(0, Number(e.target.value) || 0))}
+                className="w-28"
+              />
+              <div className="flex gap-1">
+                {[10, 20, 50].map((n) => (
+                  <Button key={n} type="button" variant={perFile === n ? "secondary" : "outline"} size="sm" onClick={() => setPerFile(n)}>
+                    {n}
+                  </Button>
+                ))}
+                <Button type="button" variant={perFile === 0 ? "secondary" : "outline"} size="sm" onClick={() => setPerFile(0)}>
+                  Tudo
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {activeProducts.length} produto(s) ativo(s) → {totalFiles} arquivo(s). Arquivos menores evitam recusa por tamanho/volume no upload em massa.
+            </p>
+          </div>
           <p className="text-xs text-muted-foreground">
             Sem o modelo, geramos uma planilha simples com as mesmas colunas — útil para conferência, mas a Shopee pode recusar no upload.
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             <Button onClick={run} disabled={busy} className="bg-gradient-brand text-primary-foreground border-0">
-              {busy ? "Gerando…" : file ? "Preencher modelo" : "Gerar planilha simples"}
+              {busy ? "Gerando…" : file ? `Preencher modelo (${totalFiles} arquivo${totalFiles > 1 ? "s" : ""})` : `Gerar planilha simples (${totalFiles})`}
             </Button>
           </div>
         </div>
