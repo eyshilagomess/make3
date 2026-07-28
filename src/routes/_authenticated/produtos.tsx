@@ -1112,11 +1112,7 @@ function ShopeeExportDialog({ open, onClose, products }: { open: boolean; onClos
   const [perFile, setPerFile] = useState<number>(20);
 
   const activeProducts = products.filter((p: any) => !p.status || p.status === "ativo");
-  const problems = activeProducts
-    .map((p: any) => ({ name: String(p.name ?? "(sem nome)"), miss: tiktokProductIssues(p, { category: category || "x" }) }))
-    .filter((x) => x.miss.length > 0);
-  const readyProducts = activeProducts.length - problems.length;
-  const totalFiles = perFile > 0 ? Math.max(1, Math.ceil(readyProducts / perFile)) : 1;
+  const totalFiles = perFile > 0 ? Math.max(1, Math.ceil(activeProducts.length / perFile)) : 1;
 
   const run = async () => {
     setBusy(true);
