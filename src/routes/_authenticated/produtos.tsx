@@ -19,6 +19,7 @@ import { brl, dateBR } from "@/lib/format";
 import { calcAllPrices, calcPrice, marginFromPrice, CHANNEL_FEES, CHANNEL_LABEL, totalCost, type Channel } from "@/lib/pricing";
 import * as XLSX from "xlsx";
 import shopeeTemplate from "@/lib/shopee-template.json";
+import tiktokTemplate from "@/lib/tiktok-template.json";
 import { useServerFn } from "@tanstack/react-start";
 import { extractFromImage } from "@/lib/extract-invoice.functions";
 import { searchProductImage } from "@/lib/search-image.functions";
@@ -55,6 +56,7 @@ function Page() {
   const [variantsFor, setVariantsFor] = useState<{ id: string; name: string } | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [shopeeOpen, setShopeeOpen] = useState(false);
+  const [tiktokOpen, setTiktokOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
@@ -417,6 +419,7 @@ function Page() {
           </Button>
           <Button variant="outline" onClick={downloadTemplate}><Download className="h-4 w-4 mr-1" /> Modelo</Button>
           <Button variant="outline" onClick={() => setShopeeOpen(true)}><Download className="h-4 w-4 mr-1" /> Exportar Shopee</Button>
+          <Button variant="outline" onClick={() => setTiktokOpen(true)}><Download className="h-4 w-4 mr-1" /> Exportar TikTok</Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-1" /> Importar</Button>
           <Button variant="outline" onClick={() => setInvoiceOpen(true)}><FileText className="h-4 w-4 mr-1" /> Nota fiscal</Button>
           <Dialog open={open} onOpenChange={setOpen}>
@@ -577,6 +580,7 @@ function Page() {
       <VariantsDialog open={!!variantsFor} product={variantsFor} onClose={() => setVariantsFor(null)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <ShopeeExportDialog open={shopeeOpen} onClose={() => setShopeeOpen(false)} products={filtered} />
+      <TiktokExportDialog open={tiktokOpen} onClose={() => setTiktokOpen(false)} products={filtered} />
       <InvoiceDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <CostHistoryDialog open={!!historyFor} product={historyFor} onClose={() => setHistoryFor(null)} />
       <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
