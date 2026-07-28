@@ -1362,7 +1362,11 @@ function TiktokExportDialog({ open, onClose, products }: { open: boolean; onClos
   const [lists, setLists] = useState<{ categories: string[]; brands: string[] }>({ categories: [], brands: [] });
 
   const activeProducts = products.filter((p: any) => !p.status || p.status === "ativo");
-  const totalFiles = perFile > 0 ? Math.max(1, Math.ceil(activeProducts.length / perFile)) : 1;
+  const problems = activeProducts
+    .map((p: any) => ({ name: String(p.name ?? "(sem nome)"), miss: tiktokProductIssues(p, { category: category || "x" }) }))
+    .filter((x: { miss: string[] }) => x.miss.length > 0);
+  const readyProducts = activeProducts.length - problems.length;
+  const totalFiles = perFile > 0 ? Math.max(1, Math.ceil(readyProducts / perFile)) : 1;
 
   const onFile = async (f: File | null) => {
     setFile(f);
