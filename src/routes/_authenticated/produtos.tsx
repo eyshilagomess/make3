@@ -30,14 +30,14 @@ export const Route = createFileRoute("/_authenticated/produtos")({
 
 type Form = {
   name: string; sku: string; category: string; brand: string; supplier_id: string;
-  photo_url: string; cost: string; packaging_cost: string; other_costs: string; target_margin: string;
+  photo_url: string; description: string; cost: string; packaging_cost: string; other_costs: string; target_margin: string;
   stock: string; min_stock: string;
   has_variants: boolean;
   price_site: string; price_shopee: string; price_tiktok: string;
   margin_site: string; margin_shopee: string; margin_tiktok: string;
 };
 const empty: Form = {
-  name: "", sku: "", category: "", brand: "", supplier_id: "", photo_url: "",
+  name: "", sku: "", category: "", brand: "", supplier_id: "", photo_url: "", description: "",
   cost: "0", packaging_cost: "0", other_costs: "0", target_margin: "30",
   stock: "0", min_stock: "0", has_variants: false,
   price_site: "", price_shopee: "", price_tiktok: "",
@@ -256,6 +256,7 @@ function Page() {
   const buildPayload = (f: Form) => ({
     name: f.name, sku: f.sku || null, category: f.category || null, brand: f.brand || null,
     supplier_id: f.supplier_id || null, photo_url: f.photo_url || null,
+    description: f.description?.trim() ? f.description.trim() : null,
     cost: Number(f.cost || 0),
     packaging_cost: Number(f.packaging_cost || 0),
     other_costs: Number(f.other_costs || 0),
@@ -346,6 +347,7 @@ function Page() {
     setForm({
       name: p.name ?? "", sku: p.sku ?? "", category: p.category ?? "", brand: p.brand ?? "",
       supplier_id: p.supplier_id ?? "", photo_url: p.photo_url ?? "",
+      description: p.description ?? "",
       cost: String(p.cost ?? 0), packaging_cost: String(p.packaging_cost ?? 0),
       other_costs: String(p.other_costs ?? 0), target_margin: String(p.target_margin ?? 0),
       stock: String(p.stock ?? 0), min_stock: String(p.min_stock ?? 0),
