@@ -1112,7 +1112,11 @@ function ShopeeExportDialog({ open, onClose, products }: { open: boolean; onClos
   const [perFile, setPerFile] = useState<number>(20);
 
   const activeProducts = products.filter((p: any) => !p.status || p.status === "ativo");
-  const totalFiles = perFile > 0 ? Math.max(1, Math.ceil(activeProducts.length / perFile)) : 1;
+  const problems = activeProducts
+    .map((p: any) => ({ name: String(p.name ?? "(sem nome)"), miss: tiktokProductIssues(p, { category: category || "x" }) }))
+    .filter((x) => x.miss.length > 0);
+  const readyProducts = activeProducts.length - problems.length;
+  const totalFiles = perFile > 0 ? Math.max(1, Math.ceil(readyProducts / perFile)) : 1;
 
   const run = async () => {
     setBusy(true);
@@ -1371,13 +1375,21 @@ function TiktokExportDialog({ open, onClose, products }: { open: boolean; onClos
   };
 
   const run = async () => {
+    if (!category.trim()) return toast.error("Selecione a categoria do TikTok — ela é obrigatória.");
     setBusy(true);
     try {
       const opts = { category, brand };
       const res = file
         ? await exportTiktokFromTemplate(products, file, opts, perFile)
         : await exportTiktokGeneric(products, opts, perFile);
-      toast.success(`${res.rows} linha(s) em ${res.files} arquivo(s)${file ? " no modelo oficial do TikTok" : ""}`);
+      if (res.rows === 0) {
+        toast.error("Nenhum produto está completo para o TikTok. Preencha foto, descrição e preço TikTok.");
+        return;
+      }
+      toast.success(
+        `${res.rows} linha(s) em ${res.files} arquivo(s)${file ? " no modelo oficial do TikTok" : ""}` +
+          (res.skipped.length ? ` · ${res.skipped.length} produto(s) ignorado(s) por falta de dados` : ""),
+      );
       onClose();
     } catch (e: any) {
       toast.error(e.message ?? "Falha ao gerar a planilha");
@@ -1428,9 +1440,22 @@ function TiktokExportDialog({ open, onClose, products }: { open: boolean; onClos
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              {activeProducts.length} produto(s) ativo(s) → {totalFiles} arquivo(s).
+              {readyProducts} de {activeProducts.length} produto(s) prontos → {totalFiles} arquivo(s).
             </p>
           </div>
+          {problems.length > 0 && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 space-y-1 max-h-40 overflow-y-auto">
+              <p className="text-xs font-medium text-destructive">
+                {problems.length} produto(s) serão ignorados por falta de dados obrigatórios do TikTok:
+              </p>
+              {problems.slice(0, 20).map((p) => (
+                <p key={p.name} className="text-[11px] text-muted-foreground">
+                  {p.name} — falta: {p.miss.join(", ")}
+                </p>
+              ))}
+              {problems.length > 20 && <p className="text-[11px] text-muted-foreground">…e mais {problems.length - 20}.</p>}
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             <Button onClick={run} disabled={busy} className="bg-gradient-brand text-primary-foreground border-0">
