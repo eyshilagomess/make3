@@ -469,6 +469,12 @@ function Page() {
               <Button size="sm" variant="outline" onClick={() => bulkFetchImages(false)} disabled={bulkImgBusy || bulkBusy}>
                 <ImageIcon className="h-3.5 w-3.5 mr-1" /> Substituir imagens
               </Button>
+              <Button size="sm" variant="outline" onClick={() => bulkGenerateDescriptions(true)} disabled={bulkDescBusy || bulkBusy}>
+                <Sparkles className="h-3.5 w-3.5 mr-1" /> {bulkDescBusy ? "Gerando…" : "Descrições IA (faltando)"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => bulkGenerateDescriptions(false)} disabled={bulkDescBusy || bulkBusy}>
+                <Sparkles className="h-3.5 w-3.5 mr-1" /> Refazer descrições
+              </Button>
               <Button size="sm" variant="destructive" onClick={bulkDelete} disabled={bulkBusy}>
                 <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
               </Button>
