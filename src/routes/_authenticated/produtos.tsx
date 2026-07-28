@@ -19,6 +19,7 @@ import { brl, dateBR } from "@/lib/format";
 import { calcAllPrices, calcPrice, marginFromPrice, CHANNEL_FEES, CHANNEL_LABEL, totalCost, type Channel } from "@/lib/pricing";
 import * as XLSX from "xlsx";
 import shopeeTemplate from "@/lib/shopee-template.json";
+import tiktokTemplate from "@/lib/tiktok-template.json";
 import { useServerFn } from "@tanstack/react-start";
 import { extractFromImage } from "@/lib/extract-invoice.functions";
 import { searchProductImage } from "@/lib/search-image.functions";
@@ -55,6 +56,7 @@ function Page() {
   const [variantsFor, setVariantsFor] = useState<{ id: string; name: string } | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [shopeeOpen, setShopeeOpen] = useState(false);
+  const [tiktokOpen, setTiktokOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
@@ -417,6 +419,7 @@ function Page() {
           </Button>
           <Button variant="outline" onClick={downloadTemplate}><Download className="h-4 w-4 mr-1" /> Modelo</Button>
           <Button variant="outline" onClick={() => setShopeeOpen(true)}><Download className="h-4 w-4 mr-1" /> Exportar Shopee</Button>
+          <Button variant="outline" onClick={() => setTiktokOpen(true)}><Download className="h-4 w-4 mr-1" /> Exportar TikTok</Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-1" /> Importar</Button>
           <Button variant="outline" onClick={() => setInvoiceOpen(true)}><FileText className="h-4 w-4 mr-1" /> Nota fiscal</Button>
           <Dialog open={open} onOpenChange={setOpen}>
@@ -577,6 +580,7 @@ function Page() {
       <VariantsDialog open={!!variantsFor} product={variantsFor} onClose={() => setVariantsFor(null)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <ShopeeExportDialog open={shopeeOpen} onClose={() => setShopeeOpen(false)} products={filtered} />
+      <TiktokExportDialog open={tiktokOpen} onClose={() => setTiktokOpen(false)} products={filtered} />
       <InvoiceDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} onDone={() => qc.invalidateQueries({ queryKey: ["products"] })} />
       <CostHistoryDialog open={!!historyFor} product={historyFor} onClose={() => setHistoryFor(null)} />
       <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
@@ -1169,6 +1173,223 @@ function ShopeeExportDialog({ open, onClose, products }: { open: boolean; onClos
           <p className="text-xs text-muted-foreground">
             Sem o modelo, geramos uma planilha simples com as mesmas colunas — útil para conferência, mas a Shopee pode recusar no upload.
           </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            <Button onClick={run} disabled={busy} className="bg-gradient-brand text-primary-foreground border-0">
+              {busy ? "Gerando…" : file ? `Preencher modelo (${totalFiles} arquivo${totalFiles > 1 ? "s" : ""})` : `Gerar planilha simples (${totalFiles})`}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ===================== TikTok Shop (upload em massa) =====================
+// Cabeçalho oficial do modelo do TikTok Seller Center (6 primeiras linhas da aba "Template").
+const TIKTOK_TEMPLATE_HEADER: string[][] = tiktokTemplate as string[][];
+const TIKTOK_COLS = TIKTOK_TEMPLATE_HEADER[0].length;
+
+// Índices (0-based) das colunas do modelo do TikTok
+const T = {
+  category: 0, brand: 1, name: 2, description: 3,
+  mainImage: 4, image2: 5,
+  gtinType: 13, gtinCode: 14,
+  prop1Name: 15, prop1Value: 16, prop1Image: 17,
+  weight: 20, length: 21, width: 22, height: 23,
+  price: 25, quantity: 26, sellerSku: 27,
+};
+
+function buildTiktokRows(products: any[], opts: { category: string; brand: string }) {
+  const rows: any[][] = [];
+
+  for (const p of products) {
+    if (p.status && p.status !== "ativo") continue;
+
+    const make = (o: { price: any; stock: any; sku: any; variation?: string }) => {
+      const r: any[] = new Array(TIKTOK_COLS).fill("");
+      r[T.category] = opts.category || "";
+      r[T.brand] = opts.brand || "";
+      r[T.name] = String(p.name ?? "").slice(0, 255);
+      r[T.description] = String(p.description || p.name || "").slice(0, 10000);
+      r[T.mainImage] = p.photo_url ?? "";
+      if (o.variation) {
+        r[T.prop1Name] = "Cor";
+        r[T.prop1Value] = o.variation.slice(0, 50);
+        r[T.prop1Image] = p.photo_url ?? "";
+      }
+      r[T.weight] = Number(p.weight_g ?? 200); // gramas
+      r[T.length] = p.length_cm ?? 20;
+      r[T.width] = p.width_cm ?? 15;
+      r[T.height] = p.height_cm ?? 10;
+      r[T.price] = o.price != null ? Number(o.price).toFixed(2) : "";
+      r[T.quantity] = Number(o.stock ?? 0);
+      r[T.sellerSku] = o.sku ?? "";
+      return r;
+    };
+
+    const variants = p.has_variants ? (p.product_variants ?? []) : [];
+    if (variants.length > 0) {
+      for (const v of variants) {
+        rows.push(make({
+          price: Number(p.price_tiktok ?? 0) + Number(v.extra_price ?? 0),
+          stock: v.stock,
+          sku: v.sku ?? p.sku ?? "",
+          variation: v.name ?? "Único",
+        }));
+      }
+    } else {
+      rows.push(make({ price: p.price_tiktok, stock: p.stock, sku: p.sku ?? "" }));
+    }
+  }
+  return rows;
+}
+
+const tiktokFileName = (part?: number, total?: number) =>
+  `tiktok_mass_upload_make3_${new Date().toISOString().slice(0, 10)}${
+    total && total > 1 ? `_parte${String(part).padStart(2, "0")}de${String(total).padStart(2, "0")}` : ""
+  }.xlsx`;
+
+// Lê listas auxiliares (categorias/marcas) do modelo oficial enviado
+async function readTiktokLists(file: File) {
+  const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+  const grab = (name: string) => {
+    const ws = wb.Sheets[name];
+    if (!ws) return [] as string[];
+    return XLSX.utils
+      .sheet_to_json<any[]>(ws, { header: 1, blankrows: false })
+      .map((r) => String(r?.[0] ?? "").trim())
+      .filter(Boolean);
+  };
+  return { categories: grab("Category"), brands: grab("Brand") };
+}
+
+// Preenche o ARQUIVO ORIGINAL do TikTok (mantém abas auxiliares e validações)
+async function exportTiktokFromTemplate(products: any[], file: File, opts: { category: string; brand: string }, perFile = 0) {
+  const buf = await file.arrayBuffer();
+  const batches = chunk(products, perFile);
+  let rowCount = 0;
+
+  for (let i = 0; i < batches.length; i++) {
+    const rows = buildTiktokRows(batches[i], opts);
+    if (rows.length === 0) continue;
+    rowCount += rows.length;
+
+    const wb = XLSX.read(buf, { type: "array", cellStyles: true });
+    let target: string | undefined;
+    for (const name of wb.SheetNames) {
+      const aoa = XLSX.utils.sheet_to_json<any[]>(wb.Sheets[name], { header: 1, blankrows: true });
+      if ((aoa[0] ?? []).some((c) => String(c ?? "").trim() === "product_name")) { target = name; break; }
+    }
+    if (!target) throw new Error("Não encontrei a aba de produtos no modelo do TikTok enviado.");
+
+    const ws = wb.Sheets[target];
+    const aoa = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, blankrows: true });
+    const headerRows = aoa.slice(0, TIKTOK_TEMPLATE_HEADER.length);
+    const filled = XLSX.utils.aoa_to_sheet([...headerRows, ...rows]);
+    if (ws["!cols"]) filled["!cols"] = ws["!cols"];
+    wb.Sheets[target] = filled;
+
+    XLSX.writeFile(wb, tiktokFileName(i + 1, batches.length), { bookType: "xlsx", compression: true });
+    if (i < batches.length - 1) await wait(700);
+  }
+  return { rows: rowCount, files: batches.length };
+}
+
+async function exportTiktokGeneric(products: any[], opts: { category: string; brand: string }, perFile = 0) {
+  const batches = chunk(products, perFile);
+  let rowCount = 0;
+  for (let i = 0; i < batches.length; i++) {
+    const rows = buildTiktokRows(batches[i], opts);
+    if (rows.length === 0) continue;
+    rowCount += rows.length;
+    const ws = XLSX.utils.aoa_to_sheet([...TIKTOK_TEMPLATE_HEADER, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, tiktokFileName(i + 1, batches.length), { bookType: "xlsx", compression: true });
+    if (i < batches.length - 1) await wait(700);
+  }
+  return { rows: rowCount, files: batches.length };
+}
+
+function TiktokExportDialog({ open, onClose, products }: { open: boolean; onClose: () => void; products: any[] }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [perFile, setPerFile] = useState<number>(20);
+  const [category, setCategory] = useState("");
+  const [brand, setBrand] = useState("Sem marca");
+  const [lists, setLists] = useState<{ categories: string[]; brands: string[] }>({ categories: [], brands: [] });
+
+  const activeProducts = products.filter((p: any) => !p.status || p.status === "ativo");
+  const totalFiles = perFile > 0 ? Math.max(1, Math.ceil(activeProducts.length / perFile)) : 1;
+
+  const onFile = async (f: File | null) => {
+    setFile(f);
+    if (!f) return setLists({ categories: [], brands: [] });
+    try { setLists(await readTiktokLists(f)); } catch { setLists({ categories: [], brands: [] }); }
+  };
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      const opts = { category, brand };
+      const res = file
+        ? await exportTiktokFromTemplate(products, file, opts, perFile)
+        : await exportTiktokGeneric(products, opts, perFile);
+      toast.success(`${res.rows} linha(s) em ${res.files} arquivo(s)${file ? " no modelo oficial do TikTok" : ""}`);
+      onClose();
+    } catch (e: any) {
+      toast.error(e.message ?? "Falha ao gerar a planilha");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Exportar para o TikTok Shop</DialogTitle></DialogHeader>
+        <div className="space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            Baixe o modelo de upload em massa no TikTok Seller Center, selecione ele aqui e nós preenchemos seus produtos
+            dentro dele (preços do canal TikTok, estoque, SKU, fotos e descrição).
+          </p>
+          <div className="space-y-1.5">
+            <Label>Modelo oficial do TikTok (.xlsx)</Label>
+            <Input type="file" accept=".xlsx,.xls" onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
+            {file && <p className="text-xs text-muted-foreground">{file.name}</p>}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Categoria (obrigatória)</Label>
+              <Input list="tiktok-cats" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex.: Maquiagem/Base" />
+              <datalist id="tiktok-cats">
+                {lists.categories.map((c) => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Marca</Label>
+              <Input list="tiktok-brands" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Sem marca" />
+              <datalist id="tiktok-brands">
+                {lists.brands.map((b) => <option key={b} value={b} />)}
+              </datalist>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Produtos por arquivo</Label>
+            <div className="flex items-center gap-2">
+              <Input type="number" min={1} value={perFile} onChange={(e) => setPerFile(Math.max(0, Number(e.target.value) || 0))} className="w-28" />
+              <div className="flex gap-1">
+                {[10, 20, 50].map((n) => (
+                  <Button key={n} type="button" variant={perFile === n ? "secondary" : "outline"} size="sm" onClick={() => setPerFile(n)}>{n}</Button>
+                ))}
+                <Button type="button" variant={perFile === 0 ? "secondary" : "outline"} size="sm" onClick={() => setPerFile(0)}>Tudo</Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {activeProducts.length} produto(s) ativo(s) → {totalFiles} arquivo(s).
+            </p>
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             <Button onClick={run} disabled={busy} className="bg-gradient-brand text-primary-foreground border-0">
