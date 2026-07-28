@@ -22,6 +22,8 @@ import shopeeTemplate from "@/lib/shopee-template.json";
 import { useServerFn } from "@tanstack/react-start";
 import { extractFromImage } from "@/lib/extract-invoice.functions";
 import { searchProductImage } from "@/lib/search-image.functions";
+import { generateProductDescription } from "@/lib/product-description.functions";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/_authenticated/produtos")({
   head: () => ({ meta: [{ title: "Produtos — Make 3" }] }),
@@ -30,14 +32,14 @@ export const Route = createFileRoute("/_authenticated/produtos")({
 
 type Form = {
   name: string; sku: string; category: string; brand: string; supplier_id: string;
-  photo_url: string; cost: string; packaging_cost: string; other_costs: string; target_margin: string;
+  photo_url: string; description: string; cost: string; packaging_cost: string; other_costs: string; target_margin: string;
   stock: string; min_stock: string;
   has_variants: boolean;
   price_site: string; price_shopee: string; price_tiktok: string;
   margin_site: string; margin_shopee: string; margin_tiktok: string;
 };
 const empty: Form = {
-  name: "", sku: "", category: "", brand: "", supplier_id: "", photo_url: "",
+  name: "", sku: "", category: "", brand: "", supplier_id: "", photo_url: "", description: "",
   cost: "0", packaging_cost: "0", other_costs: "0", target_margin: "30",
   stock: "0", min_stock: "0", has_variants: false,
   price_site: "", price_shopee: "", price_tiktok: "",
@@ -237,6 +239,30 @@ function Page() {
     await fillMissingPhotos(onlyMissing, selected);
   };
 
+  const genDescFn = useServerFn(generateProductDescription);
+  const [bulkDescBusy, setBulkDescBusy] = useState(false);
+
+  const bulkGenerateDescriptions = async (onlyMissing: boolean) => {
+    const list = (data ?? []).filter((p: any) => selected.has(p.id) && (!onlyMissing || !p.description));
+    if (list.length === 0) { toast.info("Nada para gerar"); return; }
+    setBulkDescBusy(true);
+    const t = toast.loading(`Gerando descrições… 0/${list.length}`);
+    let ok = 0, fail = 0;
+    for (let i = 0; i < list.length; i++) {
+      const p: any = list[i];
+      try {
+        const r = await genDescFn({ data: { name: p.name, brand: p.brand, category: p.category } });
+        const { error } = await supabase.from("products").update({ description: r.description }).eq("id", p.id);
+        if (error) throw error;
+        ok++;
+      } catch { fail++; }
+      toast.loading(`Gerando descrições… ${i + 1}/${list.length}`, { id: t });
+    }
+    toast.success(`Concluído: ${ok} geradas${fail ? `, ${fail} com erro` : ""}`, { id: t });
+    setBulkDescBusy(false);
+    qc.invalidateQueries({ queryKey: ["products"] });
+  };
+
   const { data } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
@@ -256,6 +282,7 @@ function Page() {
   const buildPayload = (f: Form) => ({
     name: f.name, sku: f.sku || null, category: f.category || null, brand: f.brand || null,
     supplier_id: f.supplier_id || null, photo_url: f.photo_url || null,
+    description: f.description?.trim() ? f.description.trim() : null,
     cost: Number(f.cost || 0),
     packaging_cost: Number(f.packaging_cost || 0),
     other_costs: Number(f.other_costs || 0),
@@ -346,6 +373,7 @@ function Page() {
     setForm({
       name: p.name ?? "", sku: p.sku ?? "", category: p.category ?? "", brand: p.brand ?? "",
       supplier_id: p.supplier_id ?? "", photo_url: p.photo_url ?? "",
+      description: p.description ?? "",
       cost: String(p.cost ?? 0), packaging_cost: String(p.packaging_cost ?? 0),
       other_costs: String(p.other_costs ?? 0), target_margin: String(p.target_margin ?? 0),
       stock: String(p.stock ?? 0), min_stock: String(p.min_stock ?? 0),
@@ -440,6 +468,12 @@ function Page() {
               </Button>
               <Button size="sm" variant="outline" onClick={() => bulkFetchImages(false)} disabled={bulkImgBusy || bulkBusy}>
                 <ImageIcon className="h-3.5 w-3.5 mr-1" /> Substituir imagens
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => bulkGenerateDescriptions(true)} disabled={bulkDescBusy || bulkBusy}>
+                <Sparkles className="h-3.5 w-3.5 mr-1" /> {bulkDescBusy ? "Gerando…" : "Descrições IA (faltando)"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => bulkGenerateDescriptions(false)} disabled={bulkDescBusy || bulkBusy}>
+                <Sparkles className="h-3.5 w-3.5 mr-1" /> Refazer descrições
               </Button>
               <Button size="sm" variant="destructive" onClick={bulkDelete} disabled={bulkBusy}>
                 <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
@@ -749,6 +783,20 @@ function ProductForm({
   const searchImg = useServerFn(searchProductImage);
   const [imgBusy, setImgBusy] = useState(false);
   const [imgCandidates, setImgCandidates] = useState<string[]>([]);
+  const genDesc = useServerFn(generateProductDescription);
+  const [descBusy, setDescBusy] = useState(false);
+
+  const runDescription = async () => {
+    if (!form.name.trim()) return toast.error("Preencha o nome do produto primeiro");
+    setDescBusy(true);
+    try {
+      const r = await genDesc({ data: { name: form.name, brand: form.brand, category: form.category } });
+      setForm({ ...form, description: r.description });
+      toast.success("Descrição gerada — edite se quiser");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao gerar descrição");
+    } finally { setDescBusy(false); }
+  };
 
   const runImageSearch = async () => {
     const q = [form.brand, form.name].filter(Boolean).join(" ").trim();
@@ -813,6 +861,21 @@ function ProductForm({
             )}
           </div>
         </div>
+      </div>
+      <div className="col-span-2 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Label>Descrição</Label>
+          <Button type="button" size="sm" variant="outline" onClick={runDescription} disabled={descBusy}>
+            <Sparkles className="h-3 w-3 mr-1" />
+            {descBusy ? "Gerando…" : "Gerar com IA"}
+          </Button>
+        </div>
+        <Textarea
+          rows={5}
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder="Descrição usada no site, Shopee e TikTok. Clique em 'Gerar com IA' para criar automaticamente."
+        />
       </div>
       <div className="space-y-1.5"><Label>Custo (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={(e) => onCostChange("cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Embalagem (R$)</Label><Input type="number" step="0.01" value={form.packaging_cost} onChange={(e) => onCostChange("packaging_cost", e.target.value)} /></div>
