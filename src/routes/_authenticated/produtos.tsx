@@ -239,6 +239,30 @@ function Page() {
     await fillMissingPhotos(onlyMissing, selected);
   };
 
+  const genDescFn = useServerFn(generateProductDescription);
+  const [bulkDescBusy, setBulkDescBusy] = useState(false);
+
+  const bulkGenerateDescriptions = async (onlyMissing: boolean) => {
+    const list = (data ?? []).filter((p: any) => selected.has(p.id) && (!onlyMissing || !p.description));
+    if (list.length === 0) { toast.info("Nada para gerar"); return; }
+    setBulkDescBusy(true);
+    const t = toast.loading(`Gerando descrições… 0/${list.length}`);
+    let ok = 0, fail = 0;
+    for (let i = 0; i < list.length; i++) {
+      const p: any = list[i];
+      try {
+        const r = await genDescFn({ data: { name: p.name, brand: p.brand, category: p.category } });
+        const { error } = await supabase.from("products").update({ description: r.description }).eq("id", p.id);
+        if (error) throw error;
+        ok++;
+      } catch { fail++; }
+      toast.loading(`Gerando descrições… ${i + 1}/${list.length}`, { id: t });
+    }
+    toast.success(`Concluído: ${ok} geradas${fail ? `, ${fail} com erro` : ""}`, { id: t });
+    setBulkDescBusy(false);
+    qc.invalidateQueries({ queryKey: ["products"] });
+  };
+
   const { data } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
