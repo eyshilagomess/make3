@@ -832,6 +832,21 @@ function ProductForm({
           </div>
         </div>
       </div>
+      <div className="col-span-2 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Label>Descrição</Label>
+          <Button type="button" size="sm" variant="outline" onClick={runDescription} disabled={descBusy}>
+            <Sparkles className="h-3 w-3 mr-1" />
+            {descBusy ? "Gerando…" : "Gerar com IA"}
+          </Button>
+        </div>
+        <Textarea
+          rows={5}
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder="Descrição usada no site, Shopee e TikTok. Clique em 'Gerar com IA' para criar automaticamente."
+        />
+      </div>
       <div className="space-y-1.5"><Label>Custo (R$)</Label><Input type="number" step="0.01" value={form.cost} onChange={(e) => onCostChange("cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Embalagem (R$)</Label><Input type="number" step="0.01" value={form.packaging_cost} onChange={(e) => onCostChange("packaging_cost", e.target.value)} /></div>
       <div className="space-y-1.5"><Label>Outros custos (R$)</Label><Input type="number" step="0.01" value={form.other_costs} onChange={(e) => onCostChange("other_costs", e.target.value)} placeholder="Ex: brinde, etiqueta…" /></div>
