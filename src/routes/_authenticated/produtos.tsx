@@ -22,6 +22,8 @@ import shopeeTemplate from "@/lib/shopee-template.json";
 import { useServerFn } from "@tanstack/react-start";
 import { extractFromImage } from "@/lib/extract-invoice.functions";
 import { searchProductImage } from "@/lib/search-image.functions";
+import { generateProductDescription } from "@/lib/product-description.functions";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/_authenticated/produtos")({
   head: () => ({ meta: [{ title: "Produtos — Make 3" }] }),
@@ -751,6 +753,20 @@ function ProductForm({
   const searchImg = useServerFn(searchProductImage);
   const [imgBusy, setImgBusy] = useState(false);
   const [imgCandidates, setImgCandidates] = useState<string[]>([]);
+  const genDesc = useServerFn(generateProductDescription);
+  const [descBusy, setDescBusy] = useState(false);
+
+  const runDescription = async () => {
+    if (!form.name.trim()) return toast.error("Preencha o nome do produto primeiro");
+    setDescBusy(true);
+    try {
+      const r = await genDesc({ data: { name: form.name, brand: form.brand, category: form.category } });
+      setForm({ ...form, description: r.description });
+      toast.success("Descrição gerada — edite se quiser");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao gerar descrição");
+    } finally { setDescBusy(false); }
+  };
 
   const runImageSearch = async () => {
     const q = [form.brand, form.name].filter(Boolean).join(" ").trim();
